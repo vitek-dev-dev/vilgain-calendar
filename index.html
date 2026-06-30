@@ -1,0 +1,1359 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pracovní kalendář</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%238b5cf6'/><stop offset='1' stop-color='%236366f1'/></linearGradient><clipPath id='c'><rect x='6' y='14' width='52' height='46' rx='9'/></clipPath></defs><rect x='6' y='14' width='52' height='46' rx='9' fill='url(%23g)'/><rect x='6' y='14' width='52' height='12' fill='%230f172a' fill-opacity='.32' clip-path='url(%23c)'/><rect x='18' y='8' width='5' height='14' rx='2.5' fill='%230f172a'/><rect x='41' y='8' width='5' height='14' rx='2.5' fill='%230f172a'/><circle cx='26' cy='44' r='6.2' fill='%23fcd34d'/><g fill='%23fff'><circle cx='17' cy='35' r='2'/><circle cx='26' cy='35' r='2'/><circle cx='35' cy='35' r='2'/><circle cx='44' cy='35' r='2'/><circle cx='17' cy='44' r='2'/><circle cx='35' cy='44' r='2'/><circle cx='44' cy='44' r='2'/><circle cx='17' cy='53' r='2'/><circle cx='26' cy='53' r='2'/><circle cx='35' cy='53' r='2'/></g><circle cx='26' cy='44' r='2.2' fill='%230f172a'/></svg>">
+<style>
+  :root{
+    --bg1:#0f172a;
+    --bg2:#1e293b;
+    --card:#ffffff;
+    --ink:#0f172a;
+    --muted:#64748b;
+    --line:#e2e8f0;
+    --accent:#6366f1;
+    --accent-2:#8b5cf6;
+    --work:#ecfdf5;
+    --weekend:#f1f5f9;
+    --holiday:#dbeafe;
+    --holiday-border:#3b82f6;
+    --today:#fef3c7;
+    --today-border:#fcd34d;
+    --ok:#059669;
+    --warn:#b45309;
+    --bad:#b91c1c;
+    --info:#1d4ed8;
+    --oncall:#a21caf;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:var(--ink)}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(139,92,246,.25), transparent 60%),
+      radial-gradient(1000px 500px at 110% 10%, rgba(99,102,241,.25), transparent 60%),
+      linear-gradient(135deg,var(--bg1),var(--bg2));
+    padding:32px 16px 64px;
+  }
+  .app{max-width:1080px;margin:0 auto}
+  header.hero{
+    color:#fff;
+    display:flex;justify-content:space-between;align-items:flex-end;gap:16px;
+    margin-bottom:20px;flex-wrap:wrap;
+  }
+  .hero h1{
+    margin:0;font-size:clamp(22px,3vw,32px);font-weight:700;letter-spacing:.2px;
+    background:linear-gradient(90deg,#c4b5fd,#a7f3d0);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero p{margin:6px 0 0;color:#cbd5e1;font-size:14px}
+
+  .nav-panels{
+    display:flex;gap:12px;flex-wrap:wrap;width:100%;
+  }
+  .nav-panel{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+    padding:8px;border-radius:14px;backdrop-filter:blur(10px);color:#fff;
+  }
+  .nav-panel button, .nav-panel select, .nav-panel input{
+    background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.15);
+    padding:8px 12px;border-radius:10px;font:inherit;cursor:pointer;transition:.15s;
+  }
+  .nav-panel button:hover{background:rgba(255,255,255,.18)}
+  .view-panel{flex:0 1 auto}
+  .month-panel,.day-panel{flex:1 1 auto;min-width:0}
+  .month-panel.hidden,.day-panel.hidden{display:none}
+  .month-panel .title,.day-panel .title{
+    font-weight:600;font-size:15px;padding:0 8px;flex:1;
+    text-align:center;text-transform:capitalize;min-width:120px;
+  }
+  .pill{
+    font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.2);
+    color:#fff;background:rgba(148,163,184,.15);
+  }
+  .pill.ok{background:rgba(16,185,129,.2);border-color:rgba(16,185,129,.4)}
+  .pill.err{background:rgba(244,63,94,.2);border-color:rgba(244,63,94,.4)}
+  .pill.off{background:rgba(148,163,184,.15)}
+
+  .settings-backdrop{
+    position:fixed;inset:0;z-index:90;
+    background:rgba(2,6,23,.55);backdrop-filter:blur(3px);
+    visibility:hidden;opacity:0;
+    transition:opacity .18s ease, visibility 0s linear .18s;
+  }
+  .settings-backdrop.open{visibility:visible;opacity:1;transition:opacity .18s ease}
+  .settings{
+    position:fixed;z-index:100;
+    top:50%;left:50%;transform:translate(-50%,calc(-50% + 8px));
+    width:min(560px,calc(100% - 32px));
+    max-height:calc(100vh - 64px);
+    background:#fff;border-radius:18px;
+    box-shadow:0 30px 80px rgba(2,6,23,.45);
+    display:flex;flex-direction:column;overflow:hidden;
+    visibility:hidden;opacity:0;
+    transition:opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
+  }
+  .settings.open{visibility:visible;opacity:1;transform:translate(-50%,-50%);transition:opacity .18s ease, transform .18s ease}
+  .settings-head{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:16px 20px;border-bottom:1px solid var(--line);
+  }
+  .settings-head h2{margin:0;font-size:17px;font-weight:700}
+  .settings-close{
+    background:transparent;border:none;color:var(--muted);
+    font-size:24px;line-height:1;padding:4px 10px;border-radius:8px;cursor:pointer;
+  }
+  .settings-close:hover{background:#f1f5f9;color:var(--ink)}
+  .settings-body{padding:18px 20px;overflow:auto}
+  .settings .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .settings label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .settings input, .settings select{
+    background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:9px 11px;
+    font:inherit;color:var(--ink);
+  }
+  .settings input:focus, .settings select:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .settings .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;align-items:center}
+  .settings .actions button{
+    padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;font:inherit;
+  }
+  .settings .actions button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .settings .actions button.danger{color:var(--bad)}
+  .settings .hint{font-size:12px;color:var(--muted);flex-basis:100%}
+  .settings a{color:var(--accent)}
+
+  .cu-pill-fixed{
+    position:fixed;left:20px;bottom:20px;z-index:80;
+    background:rgba(15,23,42,.78);color:#fff;
+    border:1px solid rgba(255,255,255,.18);
+    padding:7px 14px;border-radius:999px;font-size:13px;font-weight:500;
+    box-shadow:0 10px 28px rgba(2,6,23,.45);
+    backdrop-filter:blur(8px);
+  }
+  .cu-pill-fixed.ok{background:rgba(5,150,105,.85);border-color:rgba(16,185,129,.55)}
+  .cu-pill-fixed.err{background:rgba(185,28,28,.85);border-color:rgba(244,63,94,.55)}
+  .cu-pill-fixed.off{background:rgba(71,85,105,.78);border-color:rgba(148,163,184,.4)}
+
+  .settings-fab{
+    position:fixed;right:20px;bottom:20px;z-index:80;
+    width:52px;height:52px;border-radius:50%;border:none;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 28px rgba(99,102,241,.5), 0 2px 6px rgba(15,23,42,.3);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .settings-fab:hover{
+    transform:translateY(-2px) rotate(30deg);
+    box-shadow:0 14px 32px rgba(99,102,241,.6), 0 2px 6px rgba(15,23,42,.3);
+  }
+  .settings-fab:active{transform:translateY(0) rotate(30deg)}
+  .settings-fab:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
+  .stats{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:12px;margin:20px 0;
+  }
+  @keyframes shimmer{
+    0%{background-position:200% 0}
+    100%{background-position:-200% 0}
+  }
+  .stats.loading .stat .value,
+  .stats.loading .stat.hours .value,
+  .stats.loading .stat.diff .value{
+    color:transparent;
+    -webkit-background-clip:padding-box;background-clip:padding-box;
+    background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);
+    background-size:200% 100%;
+    animation:shimmer 1.4s linear infinite;
+    border-radius:6px;width:70%;min-height:24px;
+  }
+  .stats.loading .stat .value .sep{color:transparent}
+  .stats.loading .stat:nth-child(odd) .value{width:55%}
+  .stats.loading .stat:nth-child(3n) .value{width:80%}
+  .stat{
+    background:rgba(255,255,255,.95);border-radius:14px;padding:14px 16px;
+    box-shadow:0 10px 30px rgba(2,6,23,.25);
+    display:flex;flex-direction:column;gap:2px;
+  }
+  .stat .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .stat .value{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stat .value .sep{color:var(--muted);font-weight:500}
+  .stat.hours .value{background:linear-gradient(90deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat.logged .value.ok{color:var(--ok)}
+  .stat.diff .value.pos{color:var(--ok)}
+  .stat.diff .value.neg{color:var(--bad)}
+  .stat.diff .value.zero{color:var(--muted)}
+
+  .calendar{
+    background:var(--card);border-radius:20px;overflow:hidden;
+    box-shadow:0 30px 80px rgba(2,6,23,.35);
+    position:relative;
+  }
+  .loader{
+    position:absolute;inset:0;z-index:5;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    background:rgba(255,255,255,.72);backdrop-filter:blur(2px);
+    color:var(--muted);font-size:13px;font-weight:600;letter-spacing:.3px;
+    opacity:0;pointer-events:none;transition:opacity .18s ease;
+  }
+  .calendar.loading .loader{opacity:1;pointer-events:auto}
+  .spinner{
+    width:34px;height:34px;border-radius:50%;
+    border:3px solid rgba(99,102,241,.18);
+    border-top-color:var(--accent);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .weekdays{
+    display:grid;grid-template-columns:56px repeat(7,1fr) 96px;
+    background:#f8fafc;border-bottom:1px solid var(--line);
+  }
+  .weekdays div{
+    padding:12px 10px;font-size:12px;color:var(--muted);font-weight:600;
+    text-transform:uppercase;letter-spacing:.8px;text-align:left;
+  }
+  .weekdays div.we{color:#9ca3af}
+  .weekdays div.week-head{text-align:center;background:#eef2f7}
+  .grid{display:grid;grid-template-columns:56px repeat(7,1fr) 96px}
+  .cell{
+    min-height:110px;padding:10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+    position:relative;display:flex;flex-direction:column;gap:6px;
+    background:var(--work);
+  }
+  .cell:nth-child(9n){border-right:none}
+  .cell.weeknum{
+    background:#eef2f7;padding:10px 6px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.5px;
+  }
+  .cell.week{
+    background:#f8fafc;padding:8px 10px;
+    align-items:flex-start;justify-content:center;gap:6px;
+  }
+  .cell.week.empty{background:#fafafa}
+  .cell.week .hours{position:static;transform:none;font-size:14px}
+  .cell.week .hours .unit{font-size:10px;margin-left:2px}
+  .cell.week .hours .sep{margin:0 2px}
+  .cell.week .hours.subtotal{font-size:11px;font-weight:600;opacity:.85}
+  .cell.week .hours.subtotal .sub-prefix{color:var(--muted);font-weight:700;margin-right:3px}
+  .cell.week .hours.subtotal .sep{margin:0 2px}
+  .cell.week .hours.subtotal .unit{font-size:9px;margin-left:2px}
+  .cell.week .wdash{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    color:#cbd5e1;font-size:18px;
+  }
+  .cell.other{background:#fafafa;color:#cbd5e1}
+  .cell.other .num{color:#cbd5e1}
+  .cell.weekend{background:var(--weekend)}
+  .cell.holiday{background:var(--holiday);outline:2px solid var(--holiday-border);outline-offset:-2px}
+  .cell.today{outline:2px solid var(--today-border);outline-offset:-2px;background:var(--today)}
+  .cell .num{font-weight:700;font-size:15px}
+  .cell .tag{
+    font-size:11px;padding:2px 6px;border-radius:999px;align-self:flex-start;
+    background:rgba(99,102,241,.12);color:#4338ca;
+  }
+  .cell.holiday .tag{background:rgba(59,130,246,.15);color:#1d4ed8}
+  .cell.weekend .tag{background:rgba(100,116,139,.12);color:#475569}
+  .cell .hours{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    font-size:18px;font-variant-numeric:tabular-nums;font-weight:700;
+    display:flex;align-items:baseline;gap:1px;line-height:1;white-space:nowrap;
+  }
+  .cell .hours .target{color:var(--ink)}
+  .cell .hours .logged.ok{color:var(--ok)}
+  .cell .hours .logged.bad{color:var(--bad)}
+  .cell .hours .sep{color:var(--muted);font-weight:500;margin:0 3px}
+  .cell .hours .unit{color:var(--muted);font-size:13px;font-weight:600;margin-left:4px}
+  .cell .oncall-foot{
+    position:absolute;left:0;right:0;bottom:0;
+    padding:3px 8px;font-size:11px;font-weight:700;
+    color:var(--oncall);background:rgba(162,28,175,.10);
+    border-top:1px solid rgba(162,28,175,.20);
+    display:flex;align-items:center;gap:4px;line-height:1.2;
+    font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;
+  }
+  .cell .oncall-foot .oc-ico{font-size:11px}
+  .cell .oncall-foot .unit{color:var(--muted);font-weight:600;margin-left:2px}
+  .cell.week .oncall-foot{
+    position:static;background:transparent;border-top:none;
+    padding:0;justify-content:flex-start;font-size:11px;
+  }
+  .stat.oncall .value{color:var(--oncall)}
+
+  .legend{
+    display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;color:#e2e8f0;font-size:13px;align-items:center;
+  }
+  .legend .sw{
+    display:inline-block;width:22px;height:22px;border-radius:6px;
+    border:2px solid rgba(255,255,255,.35);
+    box-shadow:inset 0 0 0 1px rgba(15,23,42,.15), 0 2px 4px rgba(2,6,23,.35);
+    margin-right:8px;vertical-align:middle;
+  }
+  .sw.work{background:#10b981}
+  .sw.weekend{background:#94a3b8}
+  .sw.holiday{background:var(--holiday-border)}
+  .sw.today{background:var(--today-border)}
+
+  .status{margin-top:10px;font-size:12px;color:#94a3b8;min-height:16px}
+
+  .view-tabs{
+    display:inline-flex;gap:2px;padding:3px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+    border-radius:11px;
+  }
+  .view-tab{
+    padding:6px 14px;border-radius:8px;background:transparent;color:#cbd5e1;
+    border:none;cursor:pointer;font:inherit;font-size:13px;font-weight:600;
+    transition:.15s;
+  }
+  .view-tab:hover{color:#fff;background:rgba(255,255,255,.08)}
+  .view-tab.active{background:rgba(255,255,255,.22);color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+
+  .today-view{
+    background:var(--card);border-radius:20px;
+    box-shadow:0 30px 80px rgba(2,6,23,.35);
+    padding:20px 24px 28px;display:none;position:relative;overflow:hidden;
+  }
+  .today-view.active{display:block}
+  .today-view .loader{position:absolute;inset:0}
+  .today-view.loading .loader{opacity:1;pointer-events:auto}
+  .today-header{
+    display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    flex-wrap:wrap;margin-bottom:18px;
+  }
+  .today-header h2{
+    margin:0;font-size:22px;font-weight:700;text-transform:capitalize;letter-spacing:.2px;
+  }
+  .today-header .sub{color:var(--muted);font-size:13px}
+  .today-stats{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:10px;margin-bottom:18px;
+  }
+  .today-stat{
+    background:#f8fafc;border:1px solid var(--line);border-radius:12px;
+    padding:10px 14px;display:flex;flex-direction:column;gap:2px;
+  }
+  .today-stat .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .today-stat .value{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+  .today-stat.diff .value.pos{color:var(--ok)}
+  .today-stat.diff .value.neg{color:var(--bad)}
+  .today-stat.diff .value.zero{color:var(--muted)}
+
+  .timeline{position:relative;margin-top:6px}
+  .tl-grid{display:flex;flex-direction:column}
+  .tl-hour{
+    height:60px;border-top:1px dashed var(--line);position:relative;
+  }
+  .tl-hour:last-child{border-bottom:1px dashed var(--line)}
+  .tl-hour .label{
+    position:absolute;left:0;top:-8px;width:46px;text-align:right;
+    font-size:11px;color:var(--muted);font-weight:600;
+    font-variant-numeric:tabular-nums;background:#fff;padding-right:6px;
+  }
+  .tl-entries{position:absolute;top:0;left:56px;right:0;bottom:0;pointer-events:none}
+  .tl-entry{
+    position:absolute;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#fff;border-radius:8px;padding:5px 9px;font-size:12px;line-height:1.25;
+    overflow:hidden;box-shadow:0 4px 12px rgba(99,102,241,.28);
+    pointer-events:auto;cursor:default;
+    box-sizing:border-box;
+    text-decoration:none;
+    transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
+    border: 1px solid white;
+  }
+  a.tl-entry.clickable{cursor:pointer}
+  a.tl-entry.clickable:hover{
+    filter:brightness(1.08);
+    box-shadow:0 6px 18px rgba(99,102,241,.42);
+  }
+  a.tl-entry.clickable:focus-visible{
+    outline:2px solid #fff;outline-offset:2px;
+  }
+  .tl-entry .t-title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tl-entry .t-meta{font-size:11px;opacity:.88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .tl-entry.short{padding:2px 8px}
+  .tl-entry.short .t-title{font-size:11px}
+  .tl-now{
+    position:absolute;left:0;right:0;height:0;border-top:2px solid #ef4444;
+    z-index:4;pointer-events:none;
+  }
+  .tl-now::before{
+    content:"";position:absolute;left:50px;top:-5px;
+    width:8px;height:8px;border-radius:50%;background:#ef4444;
+  }
+  .tl-now .now-label{
+    position:absolute;left:0;top:-9px;width:46px;text-align:right;
+    font-size:11px;color:#ef4444;font-weight:700;background:#fff;padding-right:6px;
+    font-variant-numeric:tabular-nums;
+  }
+  .tl-empty{
+    padding:48px 20px;text-align:center;color:var(--muted);font-size:14px;
+    background:#f8fafc;border-radius:12px;border:1px dashed var(--line);
+  }
+
+  @media (max-width:640px){
+    .cell{min-height:86px;padding:8px}
+    .weekdays{grid-template-columns:40px repeat(7,1fr) 64px}
+    .grid{grid-template-columns:40px repeat(7,1fr) 64px}
+    .cell.week{padding:6px 4px}
+    .cell.weeknum{font-size:11px;padding:6px 2px}
+    .today-view{padding:16px}
+    .today-header h2{font-size:18px}
+    .tl-entries{left:46px}
+    .tl-hour .label{width:38px;font-size:10px;padding-right:4px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hero">
+    <div class="nav-panels">
+      <div class="nav-panel view-panel" role="toolbar" aria-label="Pohled">
+        <div class="view-tabs" role="tablist" aria-label="Pohled">
+          <button class="view-tab active" data-view="month" role="tab" aria-selected="true">Měsíc</button>
+          <button class="view-tab" data-view="day" role="tab" aria-selected="false">Den</button>
+        </div>
+      </div>
+      <div class="nav-panel month-panel" id="month-nav" role="toolbar" aria-label="Volba měsíce">
+        <button id="prev" aria-label="Předchozí měsíc">‹</button>
+        <div class="title" id="title">—</div>
+        <button id="next" aria-label="Další měsíc">›</button>
+        <button id="today-btn" title="Skočit na dnešní měsíc">Tento měsíc</button>
+      </div>
+      <div class="nav-panel day-panel hidden" id="day-nav" role="toolbar" aria-label="Volba dne">
+        <button id="day-prev" aria-label="Předchozí den">‹</button>
+        <div class="title" id="day-title-nav">—</div>
+        <button id="day-next" aria-label="Další den">›</button>
+        <button id="day-today-btn" title="Skočit na dnešek">Dnes</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="settings-backdrop" id="settings-backdrop"></div>
+  <section class="settings" id="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-label="Nastavení">
+    <header class="settings-head">
+      <h2 id="settings-title">Nastavení</h2>
+      <button class="settings-close" id="settings-close" type="button" aria-label="Zavřít">×</button>
+    </header>
+    <div class="settings-body">
+      <div class="row">
+        <label>ClickUp API token
+          <input id="cu-token" type="password" autocomplete="off" placeholder="pk_xxx…">
+        </label>
+        <label>Workspace (team)
+          <select id="cu-team"><option value="">—</option></select>
+        </label>
+        <label>Assignee
+          <select id="cu-assignee"><option value="">(já / všichni)</option></select>
+        </label>
+        <label>Hodin / den
+          <input id="hpd" type="number" min="0" max="24" step="0.5" value="8">
+        </label>
+        <label>On Call úkoly (oddělené ;)
+          <input id="oncall-tasks" type="text" autocomplete="off" placeholder="On Call; Pohotovost; …">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="cu-connect" class="primary" type="button">Připojit / obnovit</button>
+        <button id="cu-save" type="button">Uložit</button>
+        <button id="cu-clear" class="danger" type="button">Vymazat</button>
+        <span class="hint">Token se ukládá jen do localStorage tohoto prohlížeče. Vygenerovat ho můžete v ClickUp → Profile → Apps.</span>
+      </div>
+    </div>
+  </section>
+
+  <span id="cu-pill" class="pill off cu-pill-fixed" title="ClickUp stav">ClickUp: vypnuto</span>
+
+  <button id="settings-fab" class="settings-fab" type="button" title="Nastavení" aria-label="Otevřít nastavení">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path fill="currentColor" d="M19.14 12.94a7.49 7.49 0 0 0 .05-.94 7.49 7.49 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.3 7.3 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.3 7.3 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.65 8.48a.5.5 0 0 0 .12.64L4.8 10.7c-.03.31-.05.62-.05.94s.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.43.34.68.22l2.39-.96c.5.39 1.05.71 1.63.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.58-.23 1.13-.55 1.63-.94l2.39.96c.25.1.54 0 .68-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.04-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
+    </svg>
+  </button>
+
+  <section class="stats" id="stats">
+    <div class="stat"><span class="label">Víkend / svátky</span><span class="value"><span id="s-weekend">–</span><span class="sep"> / </span><span id="s-holiday">–</span></span></div>
+    <div class="stat"><span class="label">Pracovních dnů</span><span class="value" id="s-work">–</span></div>
+    <div class="stat hours"><span class="label">Cíl hodin</span><span class="value" id="s-hours">–</span></div>
+    <div class="stat logged"><span class="label">Zalogováno</span><span class="value" id="s-logged">–</span></div>
+    <div class="stat diff">
+      <span class="label" id="s-diff-label">Rozdíl</span>
+      <span class="value" id="s-diff">–</span>
+    </div>
+    <div class="stat oncall"><span class="label">On Call</span><span class="value" id="s-oncall">–</span></div>
+  </section>
+
+  <div class="calendar" id="calendar" aria-live="polite">
+    <div class="weekdays" id="weekdays"></div>
+    <div class="grid" id="grid"></div>
+    <div class="loader" id="loader" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <div>Načítám…</div>
+    </div>
+  </div>
+
+  <section class="today-view" id="today-view" aria-label="Dnešní časová osa">
+    <div class="today-header">
+      <h2 id="today-title">Dnes</h2>
+      <div class="sub" id="today-sub"></div>
+    </div>
+    <div class="today-stats" id="today-stats">
+      <div class="today-stat"><span class="label">Zalogováno</span><span class="value" id="td-logged">–</span></div>
+      <div class="today-stat"><span class="label">Cíl</span><span class="value" id="td-goal">–</span></div>
+      <div class="today-stat"><span class="label">Zbývá</span><span class="value" id="td-remaining">–</span></div>
+      <div class="today-stat diff"><span class="label">Rozdíl</span><span class="value" id="td-diff">–</span></div>
+      <div class="today-stat"><span class="label">Záznamů</span><span class="value" id="td-count">–</span></div>
+    </div>
+    <div id="timeline-content"></div>
+    <div class="loader" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <div>Načítám…</div>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><span class="sw work"></span>Pracovní den</span>
+    <span><span class="sw weekend"></span>Víkend</span>
+    <span><span class="sw holiday"></span>Státní svátek</span>
+    <span><span class="sw today"></span>Dnes</span>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+const WEEKDAYS_CS = ["Po","Út","St","Čt","Pá","So","Ne"];
+const WEEKDAYS_FULL_CS = ["pondělí","úterý","středa","čtvrtek","pátek","sobota","neděle"];
+const MONTHS_CS = ["leden","únor","březen","duben","květen","červen","červenec","srpen","září","říjen","listopad","prosinec"];
+const MONTHS_GEN_CS = ["ledna","února","března","dubna","května","června","července","srpna","září","října","listopadu","prosince"];
+const LS_KEY = "calendar.clickup.v1";
+const VIEW_LS_KEY = "calendar.view.v1";
+const PX_PER_HOUR = 60;
+
+function viewFromHash(){
+  const h = (location.hash || "").replace(/^#/, "").toLowerCase();
+  if (h === "day" || h === "den" || h === "today" || h === "dnes") return "day";
+  if (h === "month" || h === "mesic" || h === "měsíc") return "month";
+  return null;
+}
+
+const savedView = localStorage.getItem(VIEW_LS_KEY);
+const state = {
+  view: viewFromHash() || (savedView === "day" || savedView === "today" ? "day" : "month"),
+  cursor: startOfMonth(new Date()),
+  dayCursor: startOfDay(new Date()),
+  holidays: new Map(),
+  entries: new Map(),
+  onCall: new Map(),
+  dayEntries: [],
+  hoursPerDay: (loadConfig().hoursPerDay ?? 8),
+  config: loadConfig(),
+  cuUser: null,
+  cuTeams: [],
+  loading: 0,
+};
+
+const $ = (id) => document.getElementById(id);
+
+function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function pad(n){ return String(n).padStart(2,"0"); }
+function iso(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function daysInMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); }
+function mondayIndex(d){ return (d.getDay() + 6) % 7; }
+function isoWeekNumber(date){
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+function formatHours(h){ return Number.isInteger(h) ? String(h) : h.toFixed(1); }
+function formatHoursMinutes(h){
+  if (!isFinite(h) || h <= 0) return "0 min";
+  const total = Math.round(h * 60);
+  const hh = Math.floor(total / 60);
+  const mm = total % 60;
+  if (hh === 0) return `${mm} min`;
+  if (mm === 0) return `${hh} h`;
+  return `${hh} h ${mm} min`;
+}
+function timeOfDay(d){ return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function formatTodayHeader(date){
+  const wd = WEEKDAYS_FULL_CS[mondayIndex(date)];
+  return `${wd} ${date.getDate()}. ${MONTHS_GEN_CS[date.getMonth()]} ${date.getFullYear()}`;
+}
+function setStatus(msg){ $("status").textContent = msg || ""; }
+function beginLoading(){
+  state.loading++;
+  $("calendar").classList.add("loading");
+  $("today-view").classList.add("loading");
+  $("stats").classList.add("loading");
+}
+function endLoading(){
+  state.loading = Math.max(0, state.loading - 1);
+  if (state.loading === 0){
+    $("calendar").classList.remove("loading");
+    $("today-view").classList.remove("loading");
+    $("stats").classList.remove("loading");
+  }
+}
+
+function loadConfig(){
+  const defaults = { token:"", teamId:"", assigneeId:"", hoursPerDay:8, onCallTasks:[] };
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+    return { ...defaults, ...parsed };
+  } catch { return { ...defaults }; }
+}
+function saveConfig(){ localStorage.setItem(LS_KEY, JSON.stringify(state.config)); }
+
+function renderWeekdays(){
+  const wd = $("weekdays");
+  wd.innerHTML = "";
+  const wnumHead = document.createElement("div");
+  wnumHead.className = "week-head";
+  wnumHead.textContent = "W";
+  wd.appendChild(wnumHead);
+  WEEKDAYS_CS.forEach((w,i)=>{
+    const el = document.createElement("div");
+    el.textContent = w;
+    if (i>=5) el.classList.add("we");
+    wd.appendChild(el);
+  });
+  const wtotalHead = document.createElement("div");
+  wtotalHead.className = "week-head";
+  wtotalHead.textContent = "Součet";
+  wd.appendChild(wtotalHead);
+}
+
+async function loadHolidays(year, month){
+  const firstDay = new Date(year, month, 1);
+  const n = daysInMonth(firstDay);
+  const url = `https://svatkyapi.cz/api/day/${iso(firstDay)}/interval/${n}`;
+  try{
+    const res = await fetch(url, { cache: "force-cache" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const arr = Array.isArray(data) ? data : Array.isArray(data?.days) ? data.days : [data];
+    state.holidays.clear();
+    for (const d of arr){
+      if (d && d.isHoliday) state.holidays.set(d.date, d.holidayName || "Státní svátek");
+    }
+  }catch(err){
+    state.holidays.clear();
+    setStatus("Svátky se nepodařilo načíst: " + err.message);
+  }
+}
+
+// ---- ClickUp ----
+function cuReady(){ return !!(state.config.token && state.config.teamId); }
+
+function isOnCallTask(name){
+  if (!name) return false;
+  const n = String(name).trim().toLowerCase();
+  if (!n) return false;
+  return (state.config.onCallTasks || []).some(t => {
+    const tn = String(t).trim().toLowerCase();
+    return tn && tn === n;
+  });
+}
+
+async function cuFetch(path, params){
+  const token = state.config.token;
+  if (!token) throw new Error("Chybí token");
+  const qs = params ? ("?" + new URLSearchParams(params)) : "";
+  const res = await fetch(`https://api.clickup.com/api/v2${path}${qs}`, {
+    headers: { "Authorization": token, "Accept": "application/json" }
+  });
+  if (!res.ok){
+    const body = await res.text().catch(()=>"");
+    throw new Error(`ClickUp ${res.status}${body ? ": " + body.slice(0,200) : ""}`);
+  }
+  return res.json();
+}
+
+async function cuLoadAccount(){
+  const [u, t] = await Promise.all([cuFetch("/user"), cuFetch("/team")]);
+  state.cuUser = u.user;
+  state.cuTeams = t.teams || [];
+}
+
+async function cuLoadTimeEntries(year, month){
+  state.entries.clear();
+  state.onCall.clear();
+  if (!cuReady()) return;
+  const first = new Date(year, month, 1, 0, 0, 0, 0);
+  const last = new Date(year, month+1, 0, 23, 59, 59, 999);
+  const params = { start_date: String(first.getTime()), end_date: String(last.getTime()) };
+  if (state.config.assigneeId) params.assignee = String(state.config.assigneeId);
+  try {
+    const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
+    const list = json.data || [];
+    for (const e of list){
+      const start = new Date(Number(e.start));
+      const key = iso(start);
+      const hours = Math.max(0, Number(e.duration) || 0) / 3600000;
+      const name = (e.task && e.task.name) || e.description || "";
+      if (isOnCallTask(name)){
+        state.onCall.set(key, (state.onCall.get(key) || 0) + hours);
+      } else {
+        state.entries.set(key, (state.entries.get(key) || 0) + hours);
+      }
+    }
+    setCuPill("ok", `ClickUp: ${list.length} záznamů`);
+  } catch (err){
+    setCuPill("err", "ClickUp: chyba");
+    setStatus("ClickUp: " + err.message);
+  }
+}
+
+async function cuLoadDayEntries(){
+  state.dayEntries = [];
+  if (!cuReady()) return;
+  const d = state.dayCursor;
+  const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+  const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+  const params = { start_date: String(dayStart.getTime()), end_date: String(dayEnd.getTime()) };
+  if (state.config.assigneeId) params.assignee = String(state.config.assigneeId);
+  try {
+    const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
+    const list = json.data || [];
+    const entries = [];
+    for (const e of list){
+      const startMs = Number(e.start);
+      const durMs = Math.max(0, Number(e.duration) || 0);
+      const endMs = e.end ? Number(e.end) : startMs + durMs;
+      const task = e.task || {};
+      entries.push({
+        id: e.id,
+        start: new Date(startMs),
+        end: new Date(endMs),
+        durationMs: durMs,
+        hours: durMs / 3600000,
+        taskId: task.id || null,
+        taskCustomId: task.custom_id || null,
+        taskName: task.name || e.description || "(bez úkolu)",
+        description: e.description || "",
+        taskStatus: (task.status && task.status.status) || "",
+        billable: !!e.billable,
+      });
+    }
+    entries.sort((a,b) => a.start.getTime() - b.start.getTime());
+    state.dayEntries = entries;
+    setCuPill("ok", `ClickUp: ${entries.length} záznam${entries.length===1?"":(entries.length>=2&&entries.length<=4?"y":"ů")} v daný den`);
+  } catch (err){
+    setCuPill("err", "ClickUp: chyba");
+    setStatus("ClickUp: " + err.message);
+  }
+}
+
+function setCuPill(kind, text){
+  const pill = $("cu-pill");
+  pill.className = "pill cu-pill-fixed " + kind;
+  pill.textContent = text;
+}
+
+function mkSpan(cls, text){
+  const s = document.createElement("span");
+  s.className = cls;
+  s.textContent = text;
+  return s;
+}
+
+function buildHours(hasClickUp, isWorkday, logged, target){
+  const h = document.createElement("div");
+  h.className = "hours";
+  const unit = () => mkSpan("unit", "h");
+  if (hasClickUp){
+    if (isWorkday){
+      const loggedCls = "logged " + (logged + 1e-6 >= target ? "ok" : "bad");
+      h.append(
+        mkSpan(loggedCls, formatHours(logged)),
+        mkSpan("sep", "/"),
+        mkSpan("target", formatHours(target)),
+        unit()
+      );
+      return h;
+    }
+    if (logged > 0){
+      h.append(mkSpan("logged ok", formatHours(logged)), unit());
+      return h;
+    }
+    return null;
+  }
+  if (isWorkday){
+    h.append(mkSpan("target", formatHours(target)), unit());
+    return h;
+  }
+  return null;
+}
+
+function buildOnCallFoot(hours){
+  if (!(hours > 0)) return null;
+  const f = document.createElement("div");
+  f.className = "oncall-foot";
+  f.title = "On Call (odečteno ze zalogovaného času)";
+  f.append(
+    mkSpan("oc-ico", "📞"),
+    mkSpan("oc-val", formatHours(hours)),
+    mkSpan("unit", "h")
+  );
+  return f;
+}
+
+function buildSubtotal(hasClickUp, hasWorkday, logged, target){
+  const h = buildHours(hasClickUp, hasWorkday, logged, target);
+  if (!h) return null;
+  h.classList.add("subtotal");
+  h.prepend(mkSpan("sub-prefix", "Σ"));
+  return h;
+}
+
+// ---- Render ----
+function render(){
+  if (state.view === "day") renderDay();
+  else renderMonth();
+}
+
+function assignLanes(entries){
+  const sorted = [...entries].sort((a,b) => a.start.getTime() - b.start.getTime());
+  const laneEnds = [];
+  for (const e of sorted){
+    let lane = -1;
+    for (let i=0;i<laneEnds.length;i++){
+      if (laneEnds[i] <= e.start.getTime()){ lane = i; break; }
+    }
+    if (lane === -1){ lane = laneEnds.length; laneEnds.push(0); }
+    laneEnds[lane] = e.end.getTime();
+    e.lane = lane;
+  }
+  return { entries: sorted, lanes: Math.max(1, laneEnds.length) };
+}
+
+function renderDay(){
+  const day = state.dayCursor;
+  const dayKey = iso(day);
+  const isToday = sameDay(day, new Date());
+  $("today-title").textContent = formatTodayHeader(day);
+  $("day-title-nav").textContent = formatTodayHeader(day);
+
+  const wIdx = mondayIndex(day);
+  const isWeekend = wIdx >= 5;
+  const holidayName = state.holidays.get(dayKey);
+  const isHoliday = !!holidayName;
+  const isWorkday = !isWeekend && !isHoliday;
+  const sub = $("today-sub");
+  if (isHoliday) sub.textContent = "Státní svátek: " + holidayName;
+  else if (isWeekend) sub.textContent = "Víkend";
+  else sub.textContent = "Pracovní den";
+
+  const entries = state.dayEntries;
+  const totalLogged = entries.reduce((s,e) => s + e.hours, 0);
+  const target = state.hoursPerDay;
+  const goal = isWorkday ? target : 0;
+  const remaining = Math.max(0, goal - totalLogged);
+  const hasClickUp = cuReady();
+
+  $("td-logged").textContent = hasClickUp ? formatHoursMinutes(totalLogged) : "–";
+  $("td-goal").textContent = goal > 0 ? formatHoursMinutes(goal) : "—";
+  $("td-remaining").textContent = (hasClickUp && goal > 0) ? formatHoursMinutes(remaining) : "—";
+  $("td-count").textContent = hasClickUp ? String(entries.length) : "–";
+
+  const diffEl = $("td-diff");
+  diffEl.classList.remove("pos","neg","zero");
+  if (hasClickUp && goal > 0){
+    const diff = totalLogged - goal;
+    if (Math.abs(diff) < 0.02){
+      diffEl.textContent = "0 min";
+      diffEl.classList.add("zero");
+    } else {
+      const sign = diff > 0 ? "+" : "−";
+      diffEl.textContent = sign + formatHoursMinutes(Math.abs(diff));
+      diffEl.classList.add(diff > 0 ? "pos" : "neg");
+    }
+  } else {
+    diffEl.textContent = "–";
+  }
+
+  const tlContainer = $("timeline-content");
+  tlContainer.innerHTML = "";
+
+  if (!hasClickUp){
+    const empty = document.createElement("div");
+    empty.className = "tl-empty";
+    empty.textContent = "Připojte ClickUp v nastavení (⚙), abyste viděli své dnešní záznamy.";
+    tlContainer.appendChild(empty);
+    return;
+  }
+  if (entries.length === 0){
+    const empty = document.createElement("div");
+    empty.className = "tl-empty";
+    empty.textContent = "Pro dnešek zatím nejsou žádné zalogované záznamy.";
+    tlContainer.appendChild(empty);
+    return;
+  }
+
+  const dayStartMs = startOfDay(day).getTime();
+  const nextMidnightMs = dayStartMs + 24 * 3600000;
+  // Hours-from-midnight for an entry, clamped to the visible day (handles entries
+  // that start before / end after the day, e.g. an On Call shift ending at 00:00).
+  const startFracOf = e => Math.max(0, (e.start.getTime() - dayStartMs) / 3600000);
+  const endFracOf   = e => Math.min(24, (Math.min(e.end.getTime(), nextMidnightMs) - dayStartMs) / 3600000);
+
+  let minH = 8, maxH = 18;
+  for (const e of entries){
+    const sH = Math.floor(startFracOf(e));
+    const eH = Math.ceil(endFracOf(e));
+    if (sH < minH) minH = sH;
+    if (eH > maxH) maxH = eH;
+  }
+  const now = new Date();
+  if (isToday){
+    const nowH = now.getHours();
+    if (nowH < minH) minH = nowH;
+    if (nowH + 1 > maxH) maxH = nowH + 1;
+  }
+  minH = Math.max(0, minH);
+  maxH = Math.min(24, maxH);
+  if (maxH <= minH) maxH = minH + 1;
+
+  const hourCount = maxH - minH;
+  const timeline = document.createElement("div");
+  timeline.className = "timeline";
+
+  const grid = document.createElement("div");
+  grid.className = "tl-grid";
+  for (let h = minH; h < maxH; h++){
+    const row = document.createElement("div");
+    row.className = "tl-hour";
+    const lbl = document.createElement("span");
+    lbl.className = "label";
+    lbl.textContent = `${pad(h)}:00`;
+    row.appendChild(lbl);
+    grid.appendChild(row);
+  }
+  timeline.appendChild(grid);
+
+  const entriesEl = document.createElement("div");
+  entriesEl.className = "tl-entries";
+  const { entries: laned, lanes } = assignLanes(entries.map(e => ({...e})));
+  const laneWidth = 100 / lanes;
+  for (const e of laned){
+    const startFrac = startFracOf(e);
+    const top = (startFrac - minH) * PX_PER_HOUR;
+    const height = Math.max(18, (endFracOf(e) - startFrac) * PX_PER_HOUR);
+    const taskUrl = e.taskId ? `https://app.clickup.com/t/${e.taskId}` : null;
+    const block = document.createElement(taskUrl ? "a" : "div");
+    block.className = "tl-entry";
+    if (height < 36) block.classList.add("short");
+    if (taskUrl){
+      block.href = taskUrl;
+      block.target = "_blank";
+      block.rel = "noopener noreferrer";
+      block.classList.add("clickable");
+    }
+    block.style.top = `${top}px`;
+    block.style.height = `${height}px`;
+    block.style.left = `calc(${(e.lane * laneWidth).toFixed(3)}% + ${e.lane ? 3 : 0}px)`;
+    block.style.width = `calc(${laneWidth.toFixed(3)}% - ${lanes > 1 ? 6 : 6}px)`;
+
+    const title = document.createElement("div");
+    title.className = "t-title";
+    title.textContent = e.taskCustomId ? `${e.taskCustomId} · ${e.taskName}` : e.taskName;
+    block.appendChild(title);
+
+    if (height >= 28){
+      const meta = document.createElement("div");
+      meta.className = "t-meta";
+      meta.textContent = `${timeOfDay(e.start)}–${timeOfDay(e.end)} · ${formatHoursMinutes(e.hours)}`;
+      block.appendChild(meta);
+    }
+
+    let tip = `${e.taskName}\n${timeOfDay(e.start)}–${timeOfDay(e.end)} (${formatHoursMinutes(e.hours)})`;
+    if (e.taskStatus) tip += `\nStav: ${e.taskStatus}`;
+    if (e.description && e.description !== e.taskName) tip += `\n${e.description}`;
+    if (taskUrl) tip += `\nKlikněte pro otevření v ClickUp`;
+    block.title = tip;
+
+    entriesEl.appendChild(block);
+  }
+  timeline.appendChild(entriesEl);
+
+  const nowFrac = now.getHours() + now.getMinutes()/60;
+  if (isToday && nowFrac >= minH && nowFrac <= maxH){
+    const nowLine = document.createElement("div");
+    nowLine.className = "tl-now";
+    nowLine.style.top = `${(nowFrac - minH) * PX_PER_HOUR}px`;
+    const lbl = document.createElement("span");
+    lbl.className = "now-label";
+    lbl.textContent = timeOfDay(now);
+    nowLine.appendChild(lbl);
+    timeline.appendChild(nowLine);
+  }
+
+  tlContainer.appendChild(timeline);
+}
+
+function renderMonth(){
+  const cursor = state.cursor;
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  $("title").textContent = `${MONTHS_CS[month]} ${year}`;
+
+  const grid = $("grid");
+  grid.innerHTML = "";
+
+  const first = new Date(year, month, 1);
+  const leading = mondayIndex(first);
+  const total = daysInMonth(first);
+  const cells = Math.ceil((leading + total) / 7) * 7;
+  const today = new Date();
+  const hasClickUp = cuReady();
+  const target = state.hoursPerDay;
+
+  let workDays = 0, weekendDays = 0, holidayOnWeekday = 0, loggedTotal = 0, onCallTotal = 0;
+  let weekAgg = null;
+  let weekCellRef = null;
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+  let targetToToday = 0, loggedToToday = 0;
+  let runningTarget = 0, runningLogged = 0;
+
+  for (let i=0;i<cells;i++){
+    const dayNum = i - leading + 1;
+    const date = new Date(year, month, dayNum);
+    const inMonth = dayNum >= 1 && dayNum <= total;
+    const key = iso(date);
+    const wIdx = mondayIndex(date);
+    const isWeekend = wIdx >= 5;
+    const holidayName = state.holidays.get(key);
+    const isHoliday = !!holidayName;
+    const isWorkday = inMonth && !isWeekend && !isHoliday;
+    const logged = state.entries.get(key) || 0;
+    const onCall = state.onCall.get(key) || 0;
+
+    if (i % 7 === 0){
+      weekAgg = { startDate:date, target:0, logged:0, onCall:0, workDays:0, hasInMonth:false };
+      const weeknumCell = document.createElement("div");
+      weeknumCell.className = "cell weeknum";
+      weeknumCell.textContent = "W" + isoWeekNumber(date);
+      grid.appendChild(weeknumCell);
+      weekCellRef = document.createElement("div");
+      weekCellRef.className = "cell week";
+    }
+    if (inMonth){
+      weekAgg.hasInMonth = true;
+      weekAgg.logged += logged;
+      weekAgg.onCall += onCall;
+      onCallTotal += onCall;
+      if (isWorkday){
+        weekAgg.workDays++;
+        weekAgg.target += target;
+        workDays++;
+      }
+      else if (isWeekend) weekendDays++;
+      else if (isHoliday) holidayOnWeekday++;
+      loggedTotal += logged;
+      if (isCurrentMonth && date.getDate() <= today.getDate()){
+        if (isWorkday) targetToToday += target;
+        loggedToToday += logged;
+      }
+    }
+
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    if (!inMonth) cell.classList.add("other");
+    if (inMonth && isWeekend) cell.classList.add("weekend");
+    if (inMonth && isHoliday) cell.classList.add("holiday");
+    if (inMonth && sameDay(date, today)) cell.classList.add("today");
+
+    const num = document.createElement("div");
+    num.className = "num";
+    num.textContent = date.getDate();
+    cell.appendChild(num);
+
+    if (inMonth){
+      if (isHoliday){
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = holidayName;
+        cell.appendChild(tag);
+      } else if (isWeekend){
+
+      }
+
+      const h = buildHours(hasClickUp, isWorkday, logged, target);
+      if (h) cell.appendChild(h);
+
+      if (hasClickUp){
+        const foot = buildOnCallFoot(onCall);
+        if (foot) cell.appendChild(foot);
+      }
+    }
+
+    grid.appendChild(cell);
+
+    if (i % 7 === 6){
+      if (!weekAgg.hasInMonth){
+        weekCellRef.classList.add("empty");
+        const dash = document.createElement("div");
+        dash.className = "wdash";
+        dash.textContent = "–";
+        weekCellRef.appendChild(dash);
+      } else {
+        const isWeekWorkday = weekAgg.target > 0;
+        const wh = buildHours(hasClickUp, isWeekWorkday, weekAgg.logged, weekAgg.target);
+        if (wh) weekCellRef.appendChild(wh);
+        runningTarget += weekAgg.target;
+        runningLogged += weekAgg.logged;
+        const sub = buildSubtotal(hasClickUp, runningTarget > 0, runningLogged, runningTarget);
+        if (sub) weekCellRef.appendChild(sub);
+        if (hasClickUp){
+          const wfoot = buildOnCallFoot(weekAgg.onCall);
+          if (wfoot) weekCellRef.appendChild(wfoot);
+        }
+      }
+      grid.appendChild(weekCellRef);
+    }
+  }
+
+  const targetTotal = workDays * target;
+  $("s-work").textContent = workDays;
+  $("s-weekend").textContent = weekendDays;
+  $("s-holiday").textContent = holidayOnWeekday;
+  $("s-hours").textContent = formatHours(targetTotal);
+
+  const diffLabelEl = $("s-diff-label");
+  const diffEl = $("s-diff");
+  diffLabelEl.textContent = isCurrentMonth ? "Rozdíl k dnešku" : "Rozdíl";
+
+  if (hasClickUp){
+    $("s-logged").textContent = formatHours(loggedTotal);
+    $("s-oncall").textContent = formatHours(onCallTotal);
+    const diff = isCurrentMonth ? (loggedToToday - targetToToday) : (loggedTotal - targetTotal);
+    diffEl.textContent = (diff > 0 ? "+" : "") + formatHours(diff);
+    diffEl.classList.remove("pos","neg","zero");
+    if (Math.abs(diff) < 0.05) diffEl.classList.add("zero");
+    else if (diff > 0) diffEl.classList.add("pos");
+    else diffEl.classList.add("neg");
+  } else {
+    $("s-logged").textContent = "–";
+    $("s-oncall").textContent = "–";
+    diffEl.textContent = "–";
+    diffEl.classList.remove("pos","neg","zero");
+  }
+}
+
+async function refresh(){
+  beginLoading();
+  render();
+  try {
+    if (state.view === "day"){
+      await Promise.all([
+        loadHolidays(state.dayCursor.getFullYear(), state.dayCursor.getMonth()),
+        cuLoadDayEntries(),
+      ]);
+    } else {
+      await Promise.all([
+        loadHolidays(state.cursor.getFullYear(), state.cursor.getMonth()),
+        cuLoadTimeEntries(state.cursor.getFullYear(), state.cursor.getMonth()),
+      ]);
+    }
+  } finally {
+    endLoading();
+  }
+  render();
+}
+
+function setView(view, opts){
+  if (view !== "month" && view !== "day") return;
+  state.view = view;
+  try { localStorage.setItem(VIEW_LS_KEY, view); } catch {}
+  const desiredHash = "#" + view;
+  if (!opts?.skipHash && location.hash !== desiredHash){
+    try { history.pushState(null, "", desiredHash); } catch { location.hash = desiredHash; }
+  }
+  document.querySelectorAll(".view-tab").forEach(btn => {
+    const active = btn.dataset.view === view;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  $("month-nav").classList.toggle("hidden", view !== "month");
+  $("day-nav").classList.toggle("hidden", view !== "day");
+  $("calendar").style.display = view === "month" ? "" : "none";
+  $("stats").style.display = view === "month" ? "" : "none";
+  $("today-view").classList.toggle("active", view === "day");
+  refresh();
+}
+
+function shiftMonth(delta){
+  state.cursor = new Date(state.cursor.getFullYear(), state.cursor.getMonth()+delta, 1);
+  refresh();
+}
+
+function shiftDay(delta){
+  state.dayCursor = new Date(state.dayCursor.getFullYear(), state.dayCursor.getMonth(), state.dayCursor.getDate()+delta);
+  refresh();
+}
+
+// ---- Settings UI ----
+function populateTeamSelect(){
+  const sel = $("cu-team");
+  sel.innerHTML = '<option value="">—</option>';
+  for (const t of state.cuTeams){
+    const opt = document.createElement("option");
+    opt.value = t.id; opt.textContent = t.name;
+    if (String(t.id) === String(state.config.teamId)) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+function populateAssigneeSelect(){
+  const sel = $("cu-assignee");
+  sel.innerHTML = '<option value="">(já / všichni)</option>';
+  const team = state.cuTeams.find(t => String(t.id) === String(state.config.teamId || $("cu-team").value));
+  const members = team?.members || [];
+  for (const m of members){
+    const u = m.user || m;
+    const opt = document.createElement("option");
+    opt.value = u.id; opt.textContent = u.username || u.email || String(u.id);
+    if (String(u.id) === String(state.config.assigneeId)) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+function syncSettingsUI(){
+  $("cu-token").value = state.config.token || "";
+  $("hpd").value = state.hoursPerDay;
+  $("oncall-tasks").value = (state.config.onCallTasks || []).join("; ");
+  populateTeamSelect();
+  populateAssigneeSelect();
+  if (cuReady()) setCuPill("ok", "ClickUp: připojeno");
+  else if (state.config.token) setCuPill("off", "ClickUp: vyberte tým");
+  else setCuPill("off", "ClickUp: vypnuto");
+}
+
+function openSettings(){
+  $("settings").classList.add("open");
+  $("settings-backdrop").classList.add("open");
+  setTimeout(() => $("cu-token").focus(), 50);
+}
+function closeSettings(){
+  $("settings").classList.remove("open");
+  $("settings-backdrop").classList.remove("open");
+}
+function isSettingsOpen(){ return $("settings").classList.contains("open"); }
+
+async function connectClickUp(){
+  const token = $("cu-token").value.trim();
+  if (!token){ setStatus("Zadejte ClickUp token."); return; }
+  state.config.token = token;
+  try {
+    setCuPill("off", "ClickUp: připojuji…");
+    await cuLoadAccount();
+    if (!state.config.teamId && state.cuTeams[0]) state.config.teamId = state.cuTeams[0].id;
+    if (!state.config.assigneeId && state.cuUser) state.config.assigneeId = state.cuUser.id;
+    populateTeamSelect();
+    populateAssigneeSelect();
+    saveConfig();
+    setCuPill("ok", `ClickUp: ${state.cuUser?.username || "připojeno"}`);
+    setStatus("Připojeno. Načítám záznamy…");
+    refresh();
+  } catch (err){
+    setCuPill("err", "ClickUp: chyba");
+    setStatus("ClickUp: " + err.message);
+  }
+}
+
+function saveSettings(){
+  state.config.token = $("cu-token").value.trim();
+  state.config.teamId = $("cu-team").value;
+  state.config.assigneeId = $("cu-assignee").value;
+  const hpd = parseFloat($("hpd").value);
+  state.hoursPerDay = isFinite(hpd) && hpd >= 0 ? hpd : 0;
+  state.config.hoursPerDay = state.hoursPerDay;
+  state.config.onCallTasks = $("oncall-tasks").value.split(";").map(s => s.trim()).filter(Boolean);
+  saveConfig();
+  setStatus("Nastavení uloženo.");
+  closeSettings();
+  refresh();
+}
+
+function clearSettings(){
+  state.config = { token:"", teamId:"", assigneeId:"", hoursPerDay:8, onCallTasks:[] };
+  state.hoursPerDay = 8;
+  state.cuUser = null;
+  state.cuTeams = [];
+  state.entries.clear();
+  state.onCall.clear();
+  state.dayEntries = [];
+  saveConfig();
+  syncSettingsUI();
+  setStatus("Nastavení vymazáno.");
+  render();
+}
+
+document.addEventListener("DOMContentLoaded", async ()=>{
+  renderWeekdays();
+  $("prev").addEventListener("click", ()=>shiftMonth(-1));
+  $("next").addEventListener("click", ()=>shiftMonth(1));
+  $("today-btn").addEventListener("click", ()=>{ state.cursor = startOfMonth(new Date()); refresh(); });
+  $("day-prev").addEventListener("click", ()=>shiftDay(-1));
+  $("day-next").addEventListener("click", ()=>shiftDay(1));
+  $("day-today-btn").addEventListener("click", ()=>{ state.dayCursor = startOfDay(new Date()); refresh(); });
+  $("hpd").addEventListener("input", (e)=>{
+    const v = parseFloat(e.target.value);
+    state.hoursPerDay = isFinite(v) && v >= 0 ? v : 0;
+    render();
+  });
+  $("settings-fab").addEventListener("click", openSettings);
+  $("settings-close").addEventListener("click", closeSettings);
+  $("settings-backdrop").addEventListener("click", closeSettings);
+  $("cu-connect").addEventListener("click", connectClickUp);
+  $("cu-save").addEventListener("click", saveSettings);
+  $("cu-clear").addEventListener("click", clearSettings);
+  $("cu-team").addEventListener("change", ()=>{
+    state.config.teamId = $("cu-team").value;
+    populateAssigneeSelect();
+  });
+  $("cu-assignee").addEventListener("change", ()=>{
+    state.config.assigneeId = $("cu-assignee").value;
+  });
+  document.querySelectorAll(".view-tab").forEach(btn => {
+    btn.addEventListener("click", () => setView(btn.dataset.view));
+  });
+  window.addEventListener("hashchange", () => {
+    const v = viewFromHash();
+    if (v && v !== state.view) setView(v, { skipHash: true });
+  });
+  document.addEventListener("keydown", (e)=>{
+    if (e.key === "Escape" && isSettingsOpen()){
+      closeSettings();
+      e.preventDefault();
+      return;
+    }
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (state.view === "day"){
+      if (e.key === "ArrowLeft") shiftDay(-1);
+      else if (e.key === "ArrowRight") shiftDay(1);
+      return;
+    }
+    if (e.key === "ArrowLeft") shiftMonth(-1);
+    else if (e.key === "ArrowRight") shiftMonth(1);
+  });
+
+  syncSettingsUI();
+  const initialHash = "#" + state.view;
+  if (location.hash !== initialHash){
+    try { history.replaceState(null, "", initialHash); } catch { location.hash = initialHash; }
+  }
+  setView(state.view, { skipHash: true });
+  if (state.config.token){
+    try { await cuLoadAccount(); syncSettingsUI(); } catch(err){ setStatus("ClickUp: " + err.message); }
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "30100:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html
+    restart: unless-stopped
