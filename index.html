@@ -687,7 +687,11 @@ async function cuLoadTimeEntries(year, month){
   state.onCall.clear();
   if (!cuReady()) return;
   const first = new Date(year, month, 1, 0, 0, 0, 0);
-  const last = new Date(year, month+1, 0, 23, 59, 59, 999);
+  // Extend the window one extra day so entries that start on the last day of the
+  // month but end after midnight (e.g. an On Call shift ending at 00:00) are still
+  // returned by ClickUp. We bucket by the entry's start day below, so the extra
+  // day's entries land on a next-month key and are simply not rendered this month.
+  const last = new Date(year, month+1, 1, 23, 59, 59, 999);
   const params = { start_date: String(first.getTime()), end_date: String(last.getTime()) };
   if (state.config.assigneeId) params.assignee = String(state.config.assigneeId);
   try {
@@ -716,15 +720,23 @@ async function cuLoadDayEntries(){
   if (!cuReady()) return;
   const d = state.dayCursor;
   const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-  const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+  // Query through the end of the next day so an entry that starts today but ends
+  // after midnight is still returned by ClickUp; we narrow back to entries that
+  // actually start on this day below.
+  const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate()+1, 23, 59, 59, 999);
   const params = { start_date: String(dayStart.getTime()), end_date: String(dayEnd.getTime()) };
   if (state.config.assigneeId) params.assignee = String(state.config.assigneeId);
   try {
     const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
     const list = json.data || [];
+    const dayStartMs = dayStart.getTime();
+    const nextMidnightMs = dayStartMs + 24 * 3600000;
     const entries = [];
     for (const e of list){
       const startMs = Number(e.start);
+      // Keep only entries that start on the viewed day (the window above also
+      // returns next-day entries, which belong to a different day).
+      if (startMs < dayStartMs || startMs >= nextMidnightMs) continue;
       const durMs = Math.max(0, Number(e.duration) || 0);
       const endMs = e.end ? Number(e.end) : startMs + durMs;
       const task = e.task || {};
