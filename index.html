@@ -341,6 +341,7 @@
   .today-stat.diff .value.pos{color:var(--ok)}
   .today-stat.diff .value.neg{color:var(--bad)}
   .today-stat.diff .value.zero{color:var(--muted)}
+  .today-stat.oncall .value{color:var(--oncall)}
 
   .timeline{position:relative;margin-top:6px}
   .tl-grid{display:flex;flex-direction:column}
@@ -364,6 +365,13 @@
     text-decoration:none;
     transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
     border: 1px solid white;
+  }
+  .tl-entry.oncall{
+    background:linear-gradient(135deg,rgba(99,102,241,.42),rgba(139,92,246,.42));
+    box-shadow:0 4px 12px rgba(99,102,241,.16);
+  }
+  a.tl-entry.oncall.clickable:hover{
+    box-shadow:0 6px 18px rgba(99,102,241,.26);
   }
   a.tl-entry.clickable{cursor:pointer}
   a.tl-entry.clickable:hover{
@@ -506,6 +514,7 @@
       <div class="today-stat"><span class="label">Zbývá</span><span class="value" id="td-remaining">–</span></div>
       <div class="today-stat diff"><span class="label">Rozdíl</span><span class="value" id="td-diff">–</span></div>
       <div class="today-stat"><span class="label">Záznamů</span><span class="value" id="td-count">–</span></div>
+      <div class="today-stat oncall" id="td-oncall-card" hidden><span class="label">On Call</span><span class="value" id="td-oncall">–</span></div>
     </div>
     <div id="timeline-content"></div>
     <div class="loader" role="status" aria-live="polite">
@@ -692,7 +701,11 @@ async function cuLoadTimeEntries(year, month){
   // returned by ClickUp. We bucket by the entry's start day below, so the extra
   // day's entries land on a next-month key and are simply not rendered this month.
   const last = new Date(year, month+1, 1, 23, 59, 59, 999);
-  const params = { start_date: String(first.getTime()), end_date: String(last.getTime()) };
+  // ClickUp treats start_date as an exclusive lower bound, so an entry starting
+  // exactly at midnight of the 1st (== first) is dropped. Nudge the bound back a
+  // millisecond so that boundary entry is returned; anything pulled from the tail
+  // of the previous day is bucketed to a previous-month key and not rendered here.
+  const params = { start_date: String(first.getTime() - 1), end_date: String(last.getTime()) };
   if (state.config.assigneeId) params.assignee = String(state.config.assigneeId);
   try {
     const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
@@ -720,11 +733,14 @@ async function cuLoadDayEntries(){
   if (!cuReady()) return;
   const d = state.dayCursor;
   const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-  // Query through the end of the next day so an entry that starts today but ends
-  // after midnight is still returned by ClickUp; we narrow back to entries that
-  // actually start on this day below.
+  // Query from the start of the previous day through the end of the next day so a
+  // shift that crosses this day's midnight in either direction — e.g. an On Call
+  // block that began the evening before and is still running at 00:00, or one that
+  // ends after midnight — is returned by ClickUp. We narrow back to entries that
+  // actually fall on this day below.
+  const queryStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()-1, 0, 0, 0, 0);
   const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate()+1, 23, 59, 59, 999);
-  const params = { start_date: String(dayStart.getTime()), end_date: String(dayEnd.getTime()) };
+  const params = { start_date: String(queryStart.getTime()), end_date: String(dayEnd.getTime()) };
   if (state.config.assigneeId) params.assignee = String(state.config.assigneeId);
   try {
     const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
@@ -734,11 +750,14 @@ async function cuLoadDayEntries(){
     const entries = [];
     for (const e of list){
       const startMs = Number(e.start);
-      // Keep only entries that start on the viewed day (the window above also
-      // returns next-day entries, which belong to a different day).
-      if (startMs < dayStartMs || startMs >= nextMidnightMs) continue;
       const durMs = Math.max(0, Number(e.duration) || 0);
       const endMs = e.end ? Number(e.end) : startMs + durMs;
+      // The window above also returns the neighbouring days' entries. Keep only
+      // those that start on the viewed day or overlap into it (an overnight shift
+      // that began the day before and is still running through this midnight).
+      const startsInDay = startMs >= dayStartMs && startMs < nextMidnightMs;
+      const overlapsDay = startMs < dayStartMs && endMs > dayStartMs;
+      if (!startsInDay && !overlapsDay) continue;
       const task = e.task || {};
       entries.push({
         id: e.id,
@@ -864,7 +883,20 @@ function renderDay(){
   else sub.textContent = "Pracovní den";
 
   const entries = state.dayEntries;
-  const totalLogged = entries.reduce((s,e) => s + e.hours, 0);
+  const dayStartMs = startOfDay(day).getTime();
+  const nextMidnightMs = dayStartMs + 24 * 3600000;
+  // Hours-from-midnight for an entry, clamped to the visible day (handles entries
+  // that start before / end after the day, e.g. an On Call shift crossing midnight).
+  const startFracOf = e => Math.max(0, (e.start.getTime() - dayStartMs) / 3600000);
+  const endFracOf   = e => Math.min(24, (Math.min(e.end.getTime(), nextMidnightMs) - dayStartMs) / 3600000);
+  const inDayHours  = e => Math.max(0, endFracOf(e) - startFracOf(e));
+  // On Call entries are excluded from the day summary stats (logged/remaining/diff/
+  // count) and surfaced separately, mirroring the month view. They still appear as
+  // normal blocks on the timeline below. Hours are counted by the part that falls on
+  // this day so an overnight shift isn't double-counted across two days.
+  const regularEntries = entries.filter(e => !isOnCallTask(e.taskName));
+  const totalLogged = regularEntries.reduce((s,e) => s + inDayHours(e), 0);
+  const onCallTotal = entries.reduce((s,e) => s + (isOnCallTask(e.taskName) ? inDayHours(e) : 0), 0);
   const target = state.hoursPerDay;
   const goal = isWorkday ? target : 0;
   const remaining = Math.max(0, goal - totalLogged);
@@ -873,7 +905,15 @@ function renderDay(){
   $("td-logged").textContent = hasClickUp ? formatHoursMinutes(totalLogged) : "–";
   $("td-goal").textContent = goal > 0 ? formatHoursMinutes(goal) : "—";
   $("td-remaining").textContent = (hasClickUp && goal > 0) ? formatHoursMinutes(remaining) : "—";
-  $("td-count").textContent = hasClickUp ? String(entries.length) : "–";
+  $("td-count").textContent = hasClickUp ? String(regularEntries.length) : "–";
+
+  const onCallCard = $("td-oncall-card");
+  if (hasClickUp && onCallTotal > 0){
+    onCallCard.hidden = false;
+    $("td-oncall").textContent = formatHoursMinutes(onCallTotal);
+  } else {
+    onCallCard.hidden = true;
+  }
 
   const diffEl = $("td-diff");
   diffEl.classList.remove("pos","neg","zero");
@@ -908,13 +948,6 @@ function renderDay(){
     tlContainer.appendChild(empty);
     return;
   }
-
-  const dayStartMs = startOfDay(day).getTime();
-  const nextMidnightMs = dayStartMs + 24 * 3600000;
-  // Hours-from-midnight for an entry, clamped to the visible day (handles entries
-  // that start before / end after the day, e.g. an On Call shift ending at 00:00).
-  const startFracOf = e => Math.max(0, (e.start.getTime() - dayStartMs) / 3600000);
-  const endFracOf   = e => Math.min(24, (Math.min(e.end.getTime(), nextMidnightMs) - dayStartMs) / 3600000);
 
   let minH = 8, maxH = 18;
   for (const e of entries){
@@ -961,6 +994,7 @@ function renderDay(){
     const taskUrl = e.taskId ? `https://app.clickup.com/t/${e.taskId}` : null;
     const block = document.createElement(taskUrl ? "a" : "div");
     block.className = "tl-entry";
+    if (isOnCallTask(e.taskName)) block.classList.add("oncall");
     if (height < 36) block.classList.add("short");
     if (taskUrl){
       block.href = taskUrl;
