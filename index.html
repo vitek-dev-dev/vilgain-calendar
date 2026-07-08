@@ -245,6 +245,9 @@
     position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
     color:#cbd5e1;font-size:18px;
   }
+  .cell.clickable{cursor:pointer;transition:box-shadow .12s,transform .12s}
+  .cell.clickable:hover{box-shadow:inset 0 0 0 2px var(--today-border);z-index:1}
+  .cell.clickable:focus-visible{outline:2px solid var(--today-border);outline-offset:-2px}
   .cell.other{background:#fafafa;color:#cbd5e1}
   .cell.other .num{color:#cbd5e1}
   .cell.weekend{background:var(--weekend)}
@@ -1115,6 +1118,17 @@ function renderMonth(){
     if (inMonth && isWeekend) cell.classList.add("weekend");
     if (inMonth && isHoliday) cell.classList.add("holiday");
     if (inMonth && sameDay(date, today)) cell.classList.add("today");
+
+    if (inMonth){
+      const cellDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      cell.classList.add("clickable");
+      cell.setAttribute("role", "button");
+      cell.setAttribute("tabindex", "0");
+      cell.addEventListener("click", ()=>{ state.dayCursor = cellDate; setView("day"); });
+      cell.addEventListener("keydown", (e)=>{
+        if (e.key === "Enter" || e.key === " "){ e.preventDefault(); state.dayCursor = cellDate; setView("day"); }
+      });
+    }
 
     const num = document.createElement("div");
     num.className = "num";
