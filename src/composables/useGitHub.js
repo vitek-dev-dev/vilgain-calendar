@@ -81,8 +81,10 @@ query($q: String!, $n: Int!) {
 // come straight from GitHub's rollups. When `githubOrg` is configured, only PRs
 // in repositories owned by that org/user are loaded.
 export async function ghLoadPRs(){
-  state.ghPrs = [];
-  if (!ghReady()) return;
+  // Keep the previously loaded PRs visible while refetching — only reset when
+  // GitHub isn't connected. The fetched list replaces state.ghPrs atomically on
+  // success; on error we keep the stale data rather than blanking the view.
+  if (!ghReady()){ state.ghPrs = []; return; }
   try {
     let q = "is:pr is:open author:@me sort:updated-desc";
     const org = (state.config.githubOrg || "").trim();

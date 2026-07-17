@@ -238,6 +238,13 @@ a.tl-block.clickable:focus-visible{outline:2px solid #fff;outline-offset:2px}
   color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);
   border-radius:999px;padding:1px 8px;
 }
+/* Silent-reload hint: a small spinner in the section header shown while stale
+   data stays visible and a background refresh is in flight. */
+.sec-spin{
+  width:13px;height:13px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.2);border-top-color:#fff;
+  animation:spin .8s linear infinite;
+}
 .list-panel{padding:20px 22px}
 .list-panel.loading{min-height:140px}
 .list-empty{

@@ -17,7 +17,7 @@ const emptyText = computed(() =>
 </script>
 
 <template>
-  <div class="panel list-panel" :class="{ loading }">
+  <div class="panel list-panel" :class="{ loading: loading && !groups.length }">
     <div v-if="!groups.length && !loading" class="list-empty">{{ emptyText }}</div>
 
     <div v-else class="task-groups">

@@ -152,8 +152,10 @@ function normalizeTask(t){
 // assignee) across the workspace, via the "Get Filtered Team Tasks" endpoint.
 // Paginated (100/page); we bucket by status in the view model.
 export async function cuLoadTasks(){
-  state.tasks = [];
-  if (!cuReady()) return;
+  // Keep any previously loaded tasks visible while we refetch — only reset the
+  // list when there is nothing to show (ClickUp not connected). The fetched data
+  // replaces the list atomically below, and on error we keep the stale data.
+  if (!cuReady()){ state.tasks = []; return; }
   const assignee = state.config.assigneeId || (state.cuUser && String(state.cuUser.id)) || "";
   const all = [];
   try {

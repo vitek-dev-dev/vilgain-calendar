@@ -115,6 +115,7 @@ onUnmounted(() => {
         <span class="sec-ico" aria-hidden="true">☰</span>
         ClickUp tasks — assigned to me
         <span class="secct">{{ tasksModel.count }}</span>
+        <span v-if="isLoading && tasksModel.count" class="sec-spin" role="status" aria-label="Refreshing"></span>
       </div>
       <TasksView :groups="tasksModel.groups" :loading="isLoading" />
     </template>
@@ -125,6 +126,7 @@ onUnmounted(() => {
         <span class="sec-ico" aria-hidden="true">⌥</span>
         GitHub pull requests — authored by me
         <span class="secct">{{ prsModel.count }}</span>
+        <span v-if="isLoading && prsModel.count" class="sec-spin" role="status" aria-label="Refreshing"></span>
       </div>
       <PRsView :prs="prsModel.prs" :loading="isLoading" />
     </template>
