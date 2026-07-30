@@ -18,10 +18,11 @@ export function viewFromHash(){
   if (h === "month" || h === "calendar") return "month";
   if (h === "tasks") return "tasks";
   if (h === "prs" || h === "pulls" || h === "pull-requests") return "prs";
+  if (h === "templates" || h === "log") return "templates";
   return null;
 }
 
-const VIEWS = ["month", "day", "tasks", "prs"];
+const VIEWS = ["month", "day", "tasks", "prs", "templates"];
 const savedView = localStorage.getItem(VIEW_LS_KEY);
 const initialConfig = loadConfig();
 

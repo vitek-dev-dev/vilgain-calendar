@@ -3,13 +3,35 @@ import { iso } from "../utils/date.js";
 
 export function cuReady(){ return !!(state.config.token && state.config.teamId); }
 
+// On-call task names are user-supplied regexes, matched case-insensitively and
+// unanchored (use ^…$ for an exact match). Compiled patterns are cached because
+// isOnCallTask() runs per time entry; invalid patterns compile to null and never
+// match.
+const onCallReCache = new Map();
+
+function onCallRegex(pattern){
+  if (onCallReCache.has(pattern)) return onCallReCache.get(pattern);
+  let re = null;
+  try { re = new RegExp(pattern, "i"); } catch { re = null; }
+  onCallReCache.set(pattern, re);
+  return re;
+}
+
+// Blank patterns count as valid so a freshly added, still-empty row isn't flagged.
+export function isValidOnCallPattern(pattern){
+  const p = String(pattern ?? "").trim();
+  return !p || !!onCallRegex(p);
+}
+
 export function isOnCallTask(name){
   if (!name) return false;
-  const n = String(name).trim().toLowerCase();
+  const n = String(name).trim();
   if (!n) return false;
   return (state.config.onCallTasks || []).some(t => {
-    const tn = String(t).trim().toLowerCase();
-    return tn && tn === n;
+    const p = String(t).trim();
+    if (!p) return false;
+    const re = onCallRegex(p);
+    return !!re && re.test(n);
   });
 }
 
@@ -23,6 +45,36 @@ export async function cuFetch(path, params){
   if (!res.ok){
     const body = await res.text().catch(() => "");
     throw new Error(`ClickUp ${res.status}${body ? ": " + body.slice(0, 200) : ""}`);
+  }
+  return res.json();
+}
+
+// Create a single time entry via ClickUp's "Create a time entry" endpoint
+// (POST /team/{teamId}/time_entries). `start` and `duration` are epoch ms.
+// Attaches to a task when `taskId` is given, otherwise logs a description-only
+// entry. Assigns to the configured assignee when set (requires an admin token).
+export async function cuCreateTimeEntry({ start, stop, duration, description, taskId, billable }){
+  const token = state.config.token;
+  if (!token) throw new Error("Chybí token");
+  if (!state.config.teamId) throw new Error("No workspace selected");
+  // Send both `stop` and `duration`. With `duration` alone ClickUp leaves the
+  // entry's end unset ("Invalid date"), so we pass the explicit end timestamp.
+  const body = { start, stop, duration, billable: !!billable };
+  if (description) body.description = description;
+  if (taskId) body.tid = taskId;
+  if (state.config.assigneeId) body.assignee = Number(state.config.assigneeId);
+  const res = await fetch(`https://api.clickup.com/api/v2/team/${state.config.teamId}/time_entries`, {
+    method: "POST",
+    headers: {
+      "Authorization": token,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok){
+    const b = await res.text().catch(() => "");
+    throw new Error(`ClickUp ${res.status}${b ? ": " + b.slice(0, 200) : ""}`);
   }
   return res.json();
 }

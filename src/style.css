@@ -93,6 +93,8 @@ a.view-title-link .ext-ico{font-size:12px;opacity:.7}
 .tile .value.green,.tile .value.pos{color:var(--green)}
 .tile .value.red,.tile .value.neg{color:var(--red)}
 .tile .value.oncall{color:var(--oncall)}
+.tile .value.oncall{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+.tile .value.oncall .oncall-bonus{font-size:0.5em;color:var(--muted);margin-left:auto}
 .tile .value.zero{color:var(--muted)}
 /* Loading shimmer */
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -279,6 +281,39 @@ a.task-card{text-decoration:none;color:inherit}
 .task-tracked.over{color:var(--red)}
 .task-est{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
 
+/* ---------- Time entry templates ---------- */
+.tpl-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.tpl-datelbl{display:flex;align-items:center;gap:8px;font:600 12px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted)}
+.tpl-date{
+  font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:6px 10px;border:1px solid var(--hair);border-radius:8px;
+  background:var(--card);color:var(--ink);
+}
+.tpl-cards{display:flex;flex-direction:column;gap:8px}
+.tpl-card.saving{opacity:.75}
+.tpl-card.done{border-color:var(--green)}
+.tpl-card.error{border-color:var(--red)}
+.tpl-ico{font-size:20px;line-height:1;flex:none}
+.tpl-times{display:flex;align-items:center;gap:7px;flex:none}
+.tpl-time{
+  font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:5px 8px;border:1px solid var(--hair);border-radius:8px;
+  background:var(--card);color:var(--ink);font-variant-numeric:tabular-nums;
+}
+.tpl-time:disabled{opacity:.6}
+.tpl-dash{color:var(--faint);font-size:13px}
+.tpl-card .task-time{width:52px;flex:none;text-align:right}
+.tpl-log-btn{
+  flex:none;font:700 12px system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:8px 16px;border-radius:8px;border:1px solid var(--accent);
+  background:var(--accent);color:#fff;cursor:pointer;transition:filter .12s ease;
+}
+.tpl-log-btn:hover:not(:disabled){filter:brightness(1.06)}
+.tpl-log-btn:disabled{opacity:.55;cursor:default}
+.tpl-card.done .tpl-log-btn{background:var(--green);border-color:var(--green)}
+.tpl-card.error .tpl-log-btn{background:var(--red);border-color:var(--red)}
+.tpl-note{margin-top:14px}
+
 /* ---------- Pull requests ---------- */
 .pr-list{display:flex;flex-direction:column;gap:9px}
 .pr-card{
@@ -404,9 +439,11 @@ a.pr-card{text-decoration:none;color:inherit}
 /* Setting group (label + help + control) */
 .set-label{font:700 13.5px system-ui,-apple-system,"Segoe UI",sans-serif}
 .set-help{font-size:12px;color:var(--faint);margin:3px 0 12px;line-height:1.4}
+.set-help code{font-size:11.5px;background:rgba(15,23,42,.06);border-radius:4px;padding:1px 5px}
 .list-rows{display:flex;flex-direction:column;gap:8px}
 .list-row{display:flex;gap:8px}
 .list-row input{flex:1}
+.list-row input.invalid{border-color:var(--red);background:#fef2f2}
 .row-remove{
   flex:none;width:38px;border:1px solid rgba(15,23,42,.12);border-radius:10px;
   background:#fff;color:var(--red);font:700 18px system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer;

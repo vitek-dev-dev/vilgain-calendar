@@ -30,7 +30,7 @@ defineProps({
     </div>
     <div class="tile">
       <div class="label">On call</div>
-      <div class="value oncall">{{ stats.onCall }}</div>
+      <div class="value oncall">{{ stats.onCall }}<span v-if="stats.onCallBonus" class="oncall-bonus"> ({{ stats.onCallBonus }})</span></div>
     </div>
   </section>
 </template>

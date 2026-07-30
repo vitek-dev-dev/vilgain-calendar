@@ -8,6 +8,7 @@ import { useMonthView } from "./composables/useMonthView.js";
 import { useDayView } from "./composables/useDayView.js";
 import { useTasksView } from "./composables/useTasksView.js";
 import { usePRsView } from "./composables/usePRsView.js";
+import { useTemplatesView } from "./composables/useTemplatesView.js";
 
 import AppHeader from "./components/AppHeader.vue";
 import SettingsModal from "./components/SettingsModal.vue";
@@ -16,11 +17,13 @@ import MonthGrid from "./components/MonthGrid.vue";
 import DayTimeline from "./components/DayTimeline.vue";
 import TasksView from "./components/TasksView.vue";
 import PRsView from "./components/PRsView.vue";
+import TemplatesView from "./components/TemplatesView.vue";
 
 const { model: monthModel } = useMonthView();
 const { model: dayModel } = useDayView();
 const { model: tasksModel } = useTasksView();
 const { model: prsModel } = usePRsView();
+const { model: templatesModel } = useTemplatesView();
 
 const settingsOpen = ref(false);
 
@@ -129,6 +132,16 @@ onUnmounted(() => {
         <span v-if="isLoading && prsModel.count" class="sec-spin" role="status" aria-label="Refreshing"></span>
       </div>
       <PRsView :prs="prsModel.prs" :loading="isLoading" />
+    </template>
+
+    <!-- Time entry templates -->
+    <template v-else-if="state.view === 'templates'">
+      <div class="seclbl">
+        <span class="sec-ico" aria-hidden="true">⏱</span>
+        Time entry templates — one click to log to ClickUp
+        <span class="secct">{{ templatesModel.count }}</span>
+      </div>
+      <TemplatesView :groups="templatesModel.groups" />
     </template>
 
     <div class="status">{{ state.status }}</div>

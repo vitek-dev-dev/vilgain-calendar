@@ -152,6 +152,7 @@ export function useMonthView(){
         targetTotal: formatHours(targetTotal),
         logged: hasClickUp ? formatHours(loggedTotal) : "–",
         onCall: hasClickUp ? formatHours(onCallTotal) : "–",
+        onCallBonus: hasClickUp ? formatHours(onCallTotal * 0.2) : "",
         diffLabel: isCurrentMonth ? "Diff to today" : "Diff",
         diffText,
         diffClass,

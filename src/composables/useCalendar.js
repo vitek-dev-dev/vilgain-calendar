@@ -34,7 +34,7 @@ export async function refresh(){
 }
 
 export function setView(view, opts){
-  if (!["month", "day", "tasks", "prs"].includes(view)) return;
+  if (!["month", "day", "tasks", "prs", "templates"].includes(view)) return;
   state.view = view;
   try { localStorage.setItem(VIEW_LS_KEY, view); } catch { /* ignore */ }
   const desiredHash = "#" + view;

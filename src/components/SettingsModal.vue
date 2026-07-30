@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from "vue";
 import { state, saveConfig, setStatus, setCuPill, syncPill } from "../store.js";
-import { cuReady, cuLoadAccount } from "../composables/useClickUp.js";
+import { cuReady, cuLoadAccount, isValidOnCallPattern } from "../composables/useClickUp.js";
 import { ghReady, ghLoadAccount, ghLoadPRs } from "../composables/useGitHub.js";
 import { refresh } from "../composables/useCalendar.js";
 
@@ -76,12 +76,14 @@ function stepTarget(delta){
   refresh();
 }
 
-// On-call task names (row editor) — persist trimmed, non-empty values.
+// On-call task patterns (row editor) — persist trimmed, non-empty values.
+// Patterns that don't compile are kept (so the user can fix a typo) but flagged.
 function persistOnCall(){
   state.config.onCallTasks = onCallRows.value.map(s => s.trim()).filter(Boolean);
   saveConfig();
   refresh();
 }
+function onCallRowInvalid(i){ return !isValidOnCallPattern(onCallRows.value[i]); }
 function addOnCall(){ onCallRows.value.push(""); }
 function removeOnCall(i){ onCallRows.value.splice(i, 1); persistOnCall(); }
 
@@ -292,20 +294,33 @@ function disconnectGh(){
 
       <!-- ── Tasks ── -->
       <template v-else-if="activeTab === 'tasks'">
-        <!-- On-call task names -->
+        <!-- On-call task patterns -->
         <div class="set-card">
           <div>
-            <div class="set-label">On-call task names</div>
-            <div class="set-help">Hours logged to a ClickUp task with any of these names count as on-call.</div>
+            <div class="set-label">On-call task patterns</div>
+            <div class="set-help">
+              Hours logged to a ClickUp task whose name matches any of these patterns count as on-call.
+              Each row is a regular expression, case-insensitive and matched anywhere in the name —
+              e.g. <code>^oncall-</code> for a prefix, <code>^Oncall-Weekend$</code> for an exact name.
+            </div>
           </div>
           <div v-if="onCallRows.length" class="list-rows">
             <div v-for="(_, i) in onCallRows" :key="i" class="list-row">
-              <input v-model="onCallRows[i]" type="text" autocomplete="off" placeholder="Task name" @change="persistOnCall">
+              <input
+                v-model="onCallRows[i]"
+                :class="{ invalid: onCallRowInvalid(i) }"
+                :title="onCallRowInvalid(i) ? 'Not a valid regular expression — this row never matches.' : ''"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Task name pattern"
+                @change="persistOnCall"
+              >
               <button class="row-remove" type="button" aria-label="Remove" @click="removeOnCall(i)">−</button>
             </div>
           </div>
-          <div v-else class="list-empty-note">No on-call task names yet.</div>
-          <button class="row-add" type="button" @click="addOnCall">＋ Add task name</button>
+          <div v-else class="list-empty-note">No on-call task patterns yet.</div>
+          <button class="row-add" type="button" @click="addOnCall">＋ Add pattern</button>
         </div>
 
         <!-- Exclude statuses -->
