@@ -3,9 +3,12 @@ import { LS_KEY, VIEW_LS_KEY } from "./constants.js";
 import { startOfMonth, startOfDay, iso, monthKey } from "./utils/date.js";
 
 export function loadConfig(){
-  const defaults = { token: "", teamId: "", assigneeId: "", hoursPerDay: 8, workStartHour: 8, workEndHour: 16, onCallTasks: [], excludeStatuses: [], templateTasks: {}, githubToken: "", githubOrg: "" };
+  const defaults = { token: "", teamId: "", hoursPerDay: 8, workStartHour: 8, workEndHour: 16, onCallTasks: [], excludeStatuses: [], templateTasks: {}, githubToken: "", githubOrg: "" };
   try {
     const parsed = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+    // Legacy: the assignee used to be selectable. Everything is scoped to the
+    // token owner now, so a stored value is dropped rather than re-persisted.
+    delete parsed.assigneeId;
     return { ...defaults, ...parsed };
   } catch {
     return { ...defaults };
@@ -42,8 +45,9 @@ export const state = reactive({
   ghPrs: [],             // normalized GitHub pull requests authored by the current user
   hoursPerDay: initialConfig.hoursPerDay ?? 8,
   config: initialConfig,
-  cuUser: null,
-  cuTeams: [],
+  cuUser: null,          // authenticated ClickUp account; its id scopes task queries
+  cuTeams: [],           // workspaces — only the settings dialog reads these, so
+                         // they are fetched when it opens rather than on boot
   ghUser: null,          // authenticated GitHub account (login/name/avatar)
   loading: 0,
   status: "",

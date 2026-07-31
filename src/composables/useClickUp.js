@@ -52,7 +52,7 @@ export async function cuFetch(path, params){
 // Create a single time entry via ClickUp's "Create a time entry" endpoint
 // (POST /team/{teamId}/time_entries). `start` and `duration` are epoch ms.
 // Attaches to a task when `taskId` is given, otherwise logs a description-only
-// entry. Assigns to the configured assignee when set (requires an admin token).
+// entry. The entry belongs to the token owner.
 export async function cuCreateTimeEntry({ start, stop, duration, description, taskId, billable }){
   const token = state.config.token;
   if (!token) throw new Error("Chybí token");
@@ -62,7 +62,6 @@ export async function cuCreateTimeEntry({ start, stop, duration, description, ta
   const body = { start, stop, duration, billable: !!billable };
   if (description) body.description = description;
   if (taskId) body.tid = taskId;
-  if (state.config.assigneeId) body.assignee = Number(state.config.assigneeId);
   const res = await fetch(`https://api.clickup.com/api/v2/team/${state.config.teamId}/time_entries`, {
     method: "POST",
     headers: {
@@ -102,10 +101,39 @@ export async function cuLogTimeRange({ dateIso, start, end, description, taskId,
   });
 }
 
-export async function cuLoadAccount(){
-  const [u, t] = await Promise.all([cuFetch("/user"), cuFetch("/team")]);
-  state.cuUser = u.user;
-  state.cuTeams = t.teams || [];
+// The two account calls are independent and are fetched separately, because only
+// one of them is needed to render data: `/user` supplies the id every task query
+// is scoped by, while the `/team` workspace *list* is read by nothing but the
+// settings dialog (all data calls interpolate the stored `teamId`). Each shares
+// its in-flight request, so concurrent callers — a boot landing on the Tasks
+// view, a dialog opening — never duplicate a fetch.
+let userRequest = null;
+let teamsRequest = null;
+
+export async function cuLoadUser(){
+  if (userRequest) return userRequest;
+  userRequest = cuFetch("/user").then(u => { state.cuUser = u.user; });
+  try { return await userRequest; } finally { userRequest = null; }
+}
+
+export async function cuLoadTeams(){
+  if (teamsRequest) return teamsRequest;
+  teamsRequest = cuFetch("/team").then(t => { state.cuTeams = t.teams || []; });
+  try { return await teamsRequest; } finally { teamsRequest = null; }
+}
+
+// A first connect needs both: the identity to scope task queries, and the
+// workspace list to auto-select one.
+export function cuLoadAccount(){
+  return Promise.all([cuLoadUser(), cuLoadTeams()]);
+}
+
+// The authenticated user's id. Task queries are always scoped to it — omitting
+// `assignees[]` would return the whole workspace — so it is loaded on demand
+// when a view fetches before the boot-time user load has landed.
+export async function cuMyUserId(){
+  if (!state.cuUser) await cuLoadUser();
+  return state.cuUser ? String(state.cuUser.id) : "";
 }
 
 export async function cuLoadTimeEntries(year, month){
@@ -138,7 +166,6 @@ export async function cuLoadTimeEntries(year, month){
   // millisecond so that boundary entry is returned; anything pulled from the tail
   // of the previous day is bucketed to a previous-month key and not rendered here.
   const params = { start_date: String(first.getTime() - 1), end_date: String(last.getTime()) };
-  if (state.config.assigneeId) params.assignee = String(state.config.assigneeId);
   try {
     const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
     const list = json.data || [];
@@ -186,7 +213,6 @@ export async function cuLoadDayEntries(){
   const queryStart = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 0, 0, 0, 0);
   const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 23, 59, 59, 999);
   const params = { start_date: String(queryStart.getTime()), end_date: String(dayEnd.getTime()) };
-  if (state.config.assigneeId) params.assignee = String(state.config.assigneeId);
   try {
     const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
     const list = json.data || [];
@@ -253,24 +279,25 @@ function normalizeTask(t){
   };
 }
 
-// Load open + closed tasks assigned to the current user (or the configured
-// assignee) across the workspace, via the "Get Filtered Team Tasks" endpoint.
+// Load open + closed tasks assigned to the current user across the workspace,
+// via the "Get Filtered Team Tasks" endpoint.
 // Paginated (100/page); we bucket by status in the view model.
 export async function cuLoadTasks(){
   // Keep any previously loaded tasks visible while we refetch — only reset the
   // list when there is nothing to show (ClickUp not connected). The fetched data
   // replaces the list atomically below, and on error we keep the stale data.
   if (!cuReady()){ state.tasks = []; return; }
-  const assignee = state.config.assigneeId || (state.cuUser && String(state.cuUser.id)) || "";
   const all = [];
   try {
+    const assignee = await cuMyUserId();
+    if (!assignee) throw new Error("couldn't identify your account");
     for (let page = 0; page < 10; page++){
       const params = new URLSearchParams();
       params.set("page", String(page));
       params.set("include_closed", "true");
       params.set("subtasks", "true");
       params.set("order_by", "updated");
-      if (assignee) params.append("assignees[]", assignee);
+      params.append("assignees[]", assignee);
       const json = await cuFetch(`/team/${state.config.teamId}/task`, params);
       const list = json.tasks || [];
       all.push(...list);

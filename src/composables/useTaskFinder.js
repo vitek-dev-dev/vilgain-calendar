@@ -1,12 +1,12 @@
 import { ref, reactive } from "vue";
 import { state } from "../store.js";
-import { cuFetch, cuReady } from "./useClickUp.js";
+import { cuFetch, cuReady, cuMyUserId } from "./useClickUp.js";
 
 // ClickUp's v2 API has no task-name query parameter, so the finder loads a
-// page-capped pool of the current assignee's tasks once per (workspace,
-// assignee, closed) combo and filters it in the browser. Pasting a task link or
-// id bypasses the pool entirely through GET /task/{id}, which is how you reach a
-// task that is not assigned to you or falls outside the pool.
+// page-capped pool of your tasks once per (workspace, closed) combo and filters
+// it in the browser. Pasting a task link or id bypasses the pool entirely
+// through GET /task/{id}, which is how you reach a task that is not assigned to
+// you or falls outside the pool.
 const PAGE_SIZE = 100;
 const MAX_PAGES = 10;
 
@@ -122,7 +122,8 @@ function normalize(t){
 }
 
 async function fetchPool({ includeClosed }){
-  const assignee = state.config.assigneeId || (state.cuUser && String(state.cuUser.id)) || "";
+  const assignee = await cuMyUserId();
+  if (!assignee) throw new Error("Couldn't identify your ClickUp account.");
   const tasks = [];
   let truncated = false;
   for (let page = 0; page < MAX_PAGES; page++){
@@ -131,7 +132,7 @@ async function fetchPool({ includeClosed }){
     params.set("include_closed", includeClosed ? "true" : "false");
     params.set("subtasks", "true");
     params.set("order_by", "updated");
-    if (assignee) params.append("assignees[]", assignee);
+    params.append("assignees[]", assignee);
     const json = await cuFetch(`/team/${state.config.teamId}/task`, params);
     const list = json.tasks || [];
     tasks.push(...list.map(normalize));
@@ -229,8 +230,7 @@ export function useTaskFinder(){
       error.value = "Connect ClickUp in settings (⚙) first.";
       return;
     }
-    const assignee = state.config.assigneeId || (state.cuUser && String(state.cuUser.id)) || "";
-    const key = `${state.config.teamId}|${assignee || "me"}|${includeClosed ? "closed" : "open"}`;
+    const key = `${state.config.teamId}|${includeClosed ? "closed" : "open"}`;
     if (!force && pools.has(key)){
       const pool = pools.get(key);
       tasks.value = pool.tasks;

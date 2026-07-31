@@ -1,8 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
 import { state, setStatus, syncPill, viewFromHash, isLoading } from "./store.js";
-import { cuReady, cuLoadAccount } from "./composables/useClickUp.js";
-import { ghLoadAccount } from "./composables/useGitHub.js";
+import { cuReady, cuLoadUser } from "./composables/useClickUp.js";
 import { setView, shiftMonth, shiftDay } from "./composables/useCalendar.js";
 import { useMonthView } from "./composables/useMonthView.js";
 import { useDayView } from "./composables/useDayView.js";
@@ -71,20 +70,17 @@ onMounted(async () => {
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("hashchange", onHashChange);
 
+  // Only the ClickUp *identity* is loaded here — task queries are scoped by the
+  // user's id, so it is needed before any data lands. The workspace list
+  // (GET /team) and the GitHub account (GET /user) are read by nothing outside
+  // the Settings dialog, which fetches them when it opens: data calls use the
+  // stored `teamId`, and the PR list scopes itself with `author:@me`.
   if (state.config.token){
     try {
-      await cuLoadAccount();
+      await cuLoadUser();
       syncPill(cuReady());
     } catch (err){
       setStatus("ClickUp: " + err.message);
-    }
-  }
-
-  if (state.config.githubToken){
-    try {
-      await ghLoadAccount();
-    } catch (err){
-      setStatus("GitHub: " + err.message);
     }
   }
 });

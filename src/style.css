@@ -560,8 +560,8 @@ a.task-card{text-decoration:none;color:inherit}
 
 /* ---------- Log time FAB ---------- */
 .logtime-fab{
-  /* Bottom-left, opposite the settings FAB — no longer stacked above it. */
-  position:fixed;left:26px;bottom:26px;z-index:50;
+  /* Bottom-right, opposite the settings FAB in the left corner. */
+  position:fixed;right:26px;bottom:26px;z-index:50;
   height:44px;padding:0 18px;border-radius:999px;border:none;cursor:pointer;
   background:#fff;color:var(--accent);
   font:700 13px system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -670,7 +670,6 @@ a.pr-card{text-decoration:none;color:inherit}
 .badge{font:600 11px system-ui,-apple-system,"Segoe UI",sans-serif;padding:3px 10px;border-radius:999px;white-space:nowrap}
 .badge.connected{color:var(--green);background:var(--cell-work);border:1px solid #bbf7d0}
 .badge.off{color:var(--muted);background:var(--cell-weekend);border:1px solid #e2e8f0}
-.int-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .mini-field{display:block}
 .mini-label{
   display:block;font:700 11px system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -748,7 +747,7 @@ a.pr-card{text-decoration:none;color:inherit}
 
 /* ---------- Settings FAB ---------- */
 .settings-fab{
-  position:fixed;right:26px;bottom:26px;z-index:50;
+  position:fixed;left:26px;bottom:26px;z-index:50;
   width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
   background:linear-gradient(135deg,var(--accent-2),var(--accent));
   color:#fff;display:flex;align-items:center;justify-content:center;
@@ -810,5 +809,4 @@ a.pr-card{text-decoration:none;color:inherit}
   .cal-row{grid-template-columns:34px repeat(7,1fr) 96px;gap:4px}
   .daycell{min-height:88px;padding:8px}
   .dh .dh-log{font-size:15px}
-  .int-fields{grid-template-columns:1fr}
 }

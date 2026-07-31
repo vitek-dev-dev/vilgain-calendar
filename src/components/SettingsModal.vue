@@ -2,7 +2,7 @@
 import { ref, computed, watch, nextTick } from "vue";
 import { state, saveConfig, setStatus, setCuPill, syncPill, workingHours } from "../store.js";
 import { pad } from "../utils/date.js";
-import { cuReady, cuLoadAccount, isValidOnCallPattern } from "../composables/useClickUp.js";
+import { cuReady, cuLoadAccount, cuLoadTeams, isValidOnCallPattern } from "../composables/useClickUp.js";
 import { ghReady, ghLoadAccount, ghLoadPRs } from "../composables/useGitHub.js";
 import { refresh } from "../composables/useCalendar.js";
 
@@ -24,6 +24,8 @@ const ghOrgInput = ref("");
 const onCallRows = ref([]);
 const excludeRows = ref([]);
 const tokenEl = ref(null);
+const cuTeamsLoading = ref(false);
+const ghAccountLoading = ref(false);
 
 const connected = computed(() => !!state.cuUser && cuReady());
 const ghConnected = computed(() => !!state.ghUser && ghReady());
@@ -32,28 +34,56 @@ const teamOptions = computed(() =>
   state.cuTeams.map(t => ({ value: String(t.id), label: t.name })),
 );
 
-const assigneeOptions = computed(() => {
-  const team = state.cuTeams.find(t => String(t.id) === String(state.config.teamId));
-  const members = team?.members || [];
-  return members.map(m => {
-    const u = m.user || m;
-    return { value: String(u.id), label: u.username || u.email || String(u.id) };
-  });
-});
-
 const cuName = computed(() => state.cuUser?.username || state.cuUser?.email || "");
 const cuSub = computed(() => state.cuUser?.email || state.cuUser?.username || "Not connected");
 const cuInitials = computed(() => initials(cuName.value));
 
 const ghName = computed(() => state.ghUser?.name || state.ghUser?.login || "");
-const ghSub = computed(() => (state.ghUser ? ("@" + (state.ghUser.login || "")) : "Not connected"));
+const ghSub = computed(() => {
+  if (state.ghUser) return "@" + (state.ghUser.login || "");
+  return ghAccountLoading.value ? "Checking token…" : "Not connected";
+});
 const ghInitials = computed(() => initials(ghName.value) || "GH");
+const ghBadge = computed(() => {
+  if (ghAccountLoading.value) return "Checking…";
+  return ghConnected.value ? "Connected" : "Not connected";
+});
 
 function initials(name){
   if (!name) return "CU";
   const parts = String(name).trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return String(name).slice(0, 2).toUpperCase();
+}
+
+// The workspace list populates nothing but the select below, so it is fetched on
+// first open instead of on page load. On failure the list stays empty (the select
+// falls back to "—") and the status line carries the reason.
+async function loadCuTeams(){
+  cuTeamsLoading.value = true;
+  try {
+    await cuLoadTeams();
+  } catch (err){
+    setStatus("ClickUp: " + err.message);
+  } finally {
+    cuTeamsLoading.value = false;
+  }
+}
+
+// The GitHub identity is shown nowhere but this dialog, so it is fetched on
+// first open instead of on page load. A failure leaves ghUser null, which falls
+// back to the Connect form (with the stored token prefilled) and reports the
+// error on the status line — so a revoked token is visible rather than silently
+// stuck on "Connected".
+async function loadGhAccount(){
+  ghAccountLoading.value = true;
+  try {
+    await ghLoadAccount();
+  } catch (err){
+    setStatus("GitHub: " + err.message);
+  } finally {
+    ghAccountLoading.value = false;
+  }
 }
 
 // Re-hydrate the local (non-live) inputs whenever the dialog opens.
@@ -65,6 +95,12 @@ watch(() => props.open, (isOpen) => {
   ghOrgInput.value = state.config.githubOrg || "";
   onCallRows.value = [...(state.config.onCallTasks || [])];
   excludeRows.value = [...(state.config.excludeStatuses || [])];
+  // Guarded so reopening the dialog doesn't refetch what we already have, or fire
+  // a second request while the first is still in flight. The workspace list is
+  // gated on the token alone, not cuReady(), so it also loads in the state where
+  // a token is stored but no workspace has been picked yet.
+  if (!state.cuTeams.length && state.config.token && !cuTeamsLoading.value) loadCuTeams();
+  if (!state.ghUser && ghReady() && !ghAccountLoading.value) loadGhAccount();
   nextTick(() => { if (!connected.value) tokenEl.value?.focus(); });
 });
 
@@ -128,7 +164,6 @@ async function connect(){
     setCuPill("off", "ClickUp: connecting…");
     await cuLoadAccount();
     if (!state.config.teamId && state.cuTeams[0]) state.config.teamId = String(state.cuTeams[0].id);
-    if (!state.config.assigneeId && state.cuUser) state.config.assigneeId = String(state.cuUser.id);
     saveConfig();
     setCuPill("ok", `ClickUp: ${state.cuUser?.username || "connected"}`);
     setStatus("Connected. Loading time entries…");
@@ -141,7 +176,7 @@ async function connect(){
 
 function disconnect(){
   // Clear only the ClickUp credentials — every other preference survives.
-  Object.assign(state.config, { token: "", teamId: "", assigneeId: "", hoursPerDay: state.hoursPerDay });
+  Object.assign(state.config, { token: "", teamId: "", hoursPerDay: state.hoursPerDay });
   state.cuUser = null;
   state.cuTeams = [];
   state.entries.clear();
@@ -233,28 +268,17 @@ function disconnectGh(){
           </div>
 
           <template v-if="connected">
-            <div class="int-fields">
-              <label class="mini-field">
-                <span class="mini-label">Workspace</span>
-                <div class="sel-wrap">
-                  <select v-model="state.config.teamId" @change="applyClickUpSelect">
-                    <option value="">—</option>
-                    <option v-for="t in teamOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
-                  </select>
-                  <span class="sel-caret" aria-hidden="true">▾</span>
-                </div>
-              </label>
-              <label class="mini-field">
-                <span class="mini-label">Assignee</span>
-                <div class="sel-wrap">
-                  <select v-model="state.config.assigneeId" @change="applyClickUpSelect">
-                    <option value="">(me / everyone)</option>
-                    <option v-for="a in assigneeOptions" :key="a.value" :value="a.value">{{ a.label }}</option>
-                  </select>
-                  <span class="sel-caret" aria-hidden="true">▾</span>
-                </div>
-              </label>
-            </div>
+            <div v-if="cuTeamsLoading" class="int-help">Loading workspaces…</div>
+            <label v-else class="mini-field">
+              <span class="mini-label">Workspace</span>
+              <div class="sel-wrap">
+                <select v-model="state.config.teamId" @change="applyClickUpSelect">
+                  <option value="">—</option>
+                  <option v-for="t in teamOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+                </select>
+                <span class="sel-caret" aria-hidden="true">▾</span>
+              </div>
+            </label>
             <div class="disconnect-row">
               <button class="link-btn" type="button" @click="disconnect">Disconnect</button>
             </div>
@@ -286,10 +310,14 @@ function disconnectGh(){
                 <div class="int-sub">{{ ghSub }}</div>
               </div>
             </div>
-            <span class="badge" :class="ghConnected ? 'connected' : 'off'">{{ ghConnected ? "Connected" : "Not connected" }}</span>
+            <span class="badge" :class="ghConnected ? 'connected' : 'off'">{{ ghBadge }}</span>
           </div>
 
-          <template v-if="ghConnected">
+          <template v-if="ghAccountLoading">
+            <div class="int-help">Loading your GitHub account…</div>
+          </template>
+
+          <template v-else-if="ghConnected">
             <label class="mini-field">
               <span class="mini-label">Organisation</span>
               <input v-model="ghOrgInput" type="text" autocomplete="off" placeholder="my-org" @change="applyGhOrg">
