@@ -12,7 +12,13 @@ const emit = defineEmits(["log-slot"]);
 <template>
   <div>
     <section class="tiles" :class="[model.stats.onCallShow ? 'cols-6' : 'cols-5', { loading: isLoading && !dayLoaded }]">
-      <div class="tile"><div class="label">Logged</div><div class="value">{{ model.stats.logged }}</div></div>
+      <div class="tile">
+        <div class="label">Logged</div>
+        <div class="value" :class="{ 'has-note': model.stats.loggedMandays }">
+          {{ model.stats.logged }}
+          <span v-if="model.stats.loggedMandays" class="value-note">({{ model.stats.loggedMandays }})</span>
+        </div>
+      </div>
       <div class="tile"><div class="label">Target</div><div class="value">{{ model.stats.goal }}</div></div>
       <div class="tile"><div class="label">Remaining</div><div class="value green">{{ model.stats.remaining }}</div></div>
       <div class="tile"><div class="label">Diff</div><div class="value" :class="model.stats.diffClass">{{ model.stats.diffText }}</div></div>

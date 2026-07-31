@@ -3,7 +3,7 @@ import { LS_KEY, VIEW_LS_KEY } from "./constants.js";
 import { startOfMonth, startOfDay, iso, monthKey } from "./utils/date.js";
 
 export function loadConfig(){
-  const defaults = { token: "", teamId: "", hoursPerDay: 8, workStartHour: 8, workEndHour: 16, onCallTasks: [], excludeStatuses: [], priorityTasks: [], sprintFolderId: "", taskSort: "default", githubToken: "", githubOrg: "" };
+  const defaults = { token: "", teamId: "", hoursPerDay: 8, mandayHours: 8, workStartHour: 8, workEndHour: 16, onCallTasks: [], excludeStatuses: [], priorityTasks: [], sprintFolderId: "", taskSort: "default", githubToken: "", githubOrg: "" };
   try {
     const parsed = JSON.parse(localStorage.getItem(LS_KEY)) || {};
     // Legacy: the assignee used to be selectable. Everything is scoped to the
@@ -77,6 +77,14 @@ function clampHour(v, fallback){
 // The configured working-hours window, normalized to whole hours with
 // start < end. Both the settings UI and the day timeline read this so a
 // malformed stored value can never produce an inverted window.
+// Hours that make up one manday, used to express logged time in mandays. Kept
+// separate from the daily target: the target is what you aim to log, a manday is
+// the unit work is estimated in.
+export const mandayHours = computed(() => {
+  const n = Number(state.config.mandayHours);
+  return Number.isFinite(n) && n > 0 ? n : 8;
+});
+
 export const workingHours = computed(() => {
   const start = clampHour(state.config.workStartHour, 8);
   const end = clampHour(state.config.workEndHour, 16);

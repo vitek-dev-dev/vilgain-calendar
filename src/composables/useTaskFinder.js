@@ -324,8 +324,38 @@ export function sortHits(hits, { mode, stats, hasQuery }){
   return out;
 }
 
+function poolKey(includeClosed){
+  return `${state.config.teamId}|${includeClosed ? "closed" : "open"}`;
+}
+
+// key -> in-flight fetch. Shared so the boot-time prewarm and a drawer opening
+// moments later join the same request instead of racing two identical sweeps.
+const inflight = new Map();
+
+function fetchPoolOnce(key, includeClosed){
+  if (inflight.has(key)) return inflight.get(key);
+  const p = fetchPool({ includeClosed })
+    .then(pool => { pools.set(key, pool); return pool; })
+    .finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
+}
+
+// Warm the cache on boot so the Log time drawer opens against a populated list
+// instead of a spinner. Failures are swallowed — nothing is on screen to report
+// them against, and opening the drawer will retry and surface them properly.
+export function prewarmTaskPool({ includeClosed = false } = {}){
+  if (!cuReady()) return;
+  const key = poolKey(includeClosed);
+  if (pools.has(key) || inflight.has(key)) return;
+  fetchPoolOnce(key, includeClosed).catch(() => {});
+}
+
 export function useTaskFinder(){
+  // `loading` blocks the list (nothing to show yet); `refreshing` is a silent
+  // revalidation behind data that is already on screen.
   const loading = ref(false);
+  const refreshing = ref(false);
   const error = ref("");
   const tasks = ref([]);
   // Current-sprint tasks not assigned to you, kept apart from the pool so only
@@ -346,27 +376,35 @@ export function useTaskFinder(){
       error.value = "Connect ClickUp in settings (⚙) first.";
       return;
     }
-    const key = `${state.config.teamId}|${includeClosed ? "closed" : "open"}`;
-    if (!force && pools.has(key)){
-      apply(pools.get(key));
+    const key = poolKey(includeClosed);
+    const cached = pools.get(key);
+    // Show what we already have immediately, then decide whether to revalidate.
+    if (cached){
+      apply(cached);
       error.value = "";
-      return;
+      if (!force) return;
     }
-    loading.value = true;
+
+    // With data on screen the refetch is silent: no spinner over the list, and a
+    // failure leaves the stale list alone rather than emptying it.
+    const silent = !!cached;
+    if (silent) refreshing.value = true;
+    else loading.value = true;
     error.value = "";
     try {
-      const pool = await fetchPool({ includeClosed });
-      pools.set(key, pool);
-      apply(pool);
+      apply(await fetchPoolOnce(key, includeClosed));
     } catch (err){
-      error.value = err.message;
-      tasks.value = [];
-      sprintTasks.value = [];
-      truncated.value = false;
+      if (!silent){
+        error.value = err.message;
+        tasks.value = [];
+        sprintTasks.value = [];
+        truncated.value = false;
+      }
     } finally {
+      refreshing.value = false;
       loading.value = false;
     }
   }
 
-  return { loading, error, tasks, sprintTasks, truncated, load };
+  return { loading, refreshing, error, tasks, sprintTasks, truncated, load };
 }

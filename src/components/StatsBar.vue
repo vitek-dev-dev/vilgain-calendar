@@ -22,7 +22,10 @@ defineProps({
     </div>
     <div class="tile">
       <div class="label">Logged</div>
-      <div class="value">{{ stats.logged }}</div>
+      <div class="value" :class="{ 'has-note': stats.loggedMandays }">
+        {{ stats.logged }}
+        <span v-if="stats.loggedMandays" class="value-note">({{ stats.loggedMandays }})</span>
+      </div>
     </div>
     <div class="tile">
       <div class="label">{{ stats.diffLabel }}</div>
@@ -30,7 +33,10 @@ defineProps({
     </div>
     <div class="tile">
       <div class="label">On call</div>
-      <div class="value oncall">{{ stats.onCall }}<span v-if="stats.onCallBonus" class="oncall-bonus"> ({{ stats.onCallBonus }})</span></div>
+      <div class="value oncall" :class="{ 'has-note': stats.onCallBonus }">
+        {{ stats.onCall }}
+        <span v-if="stats.onCallBonus" class="value-note">({{ stats.onCallBonus }})</span>
+      </div>
     </div>
   </section>
 </template>

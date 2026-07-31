@@ -20,7 +20,7 @@ const props = defineProps({
 });
 const emit = defineEmits(["select"]);
 
-const { loading, error, tasks, sprintTasks, truncated, load } = useTaskFinder();
+const { loading, refreshing, error, tasks, sprintTasks, truncated, load } = useTaskFinder();
 
 const query = ref("");
 const includeClosed = ref(false);
@@ -118,7 +118,9 @@ watch(() => props.active, (isActive) => {
   activeIndex.value = 0;
   resolved.value = null;
   resolveError.value = "";
-  load({ includeClosed: includeClosed.value });
+  // Revalidate on every open: the cached list shows at once and is replaced when
+  // the fresh one lands.
+  load({ includeClosed: includeClosed.value, force: true });
   if (NEEDS_STATS.has(sortMode.value)) loadStats();
   if (props.autofocus) nextTick(() => inputEl.value?.focus());
 }, { immediate: true });
@@ -227,10 +229,11 @@ function breadcrumb(t){
       </label>
       <button
         class="finder-refresh"
+        :class="{ busy: refreshing }"
         type="button"
         title="Reload tasks from ClickUp"
         aria-label="Reload tasks from ClickUp"
-        :disabled="loading || !connected"
+        :disabled="loading || refreshing || !connected"
         @click="load({ includeClosed, force: true })"
       >↻</button>
     </div>

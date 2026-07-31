@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from "vue";
 import { state, setStatus, syncPill, viewFromHash, isLoading, nowTick, NOW_TICK_MS } from "./store.js";
 import { iso } from "./utils/date.js";
 import { cuReady, cuLoadUser } from "./composables/useClickUp.js";
+import { prewarmTaskPool } from "./composables/useTaskFinder.js";
 import { setView, shiftMonth, shiftDay } from "./composables/useCalendar.js";
 import { useMonthView } from "./composables/useMonthView.js";
 import { useDayView } from "./composables/useDayView.js";
@@ -95,6 +96,10 @@ onMounted(async () => {
     try {
       await cuLoadUser();
       syncPill(cuReady());
+      // Fetch the Log time task pool in the background so the drawer opens
+      // against a populated list. Deliberately not awaited — the current view's
+      // own data must not wait behind it.
+      prewarmTaskPool();
     } catch (err){
       setStatus("ClickUp: " + err.message);
     }

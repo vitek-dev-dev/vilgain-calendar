@@ -1,5 +1,5 @@
 import { computed } from "vue";
-import { state } from "../store.js";
+import { state, mandayHours } from "../store.js";
 import { MONTHS } from "../constants.js";
 import { mondayIndex, isoWeekNumber, iso, sameDay, daysInMonth, formatHours } from "../utils/date.js";
 import { cuReady } from "./useClickUp.js";
@@ -151,6 +151,7 @@ export function useMonthView(){
         workDays,
         targetTotal: formatHours(targetTotal),
         logged: hasClickUp ? formatHours(loggedTotal) : "–",
+        loggedMandays: hasClickUp && loggedTotal > 0 ? `${formatHours(loggedTotal / mandayHours.value)} MD` : "",
         onCall: hasClickUp ? formatHours(onCallTotal) : "–",
         onCallBonus: hasClickUp ? formatHours(onCallTotal * 0.2) : "",
         diffLabel: isCurrentMonth ? "Diff to today" : "Diff",

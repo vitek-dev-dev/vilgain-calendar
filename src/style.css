@@ -113,8 +113,10 @@ a.view-title-link .ext-ico{font-size:12px;opacity:.7}
 .tile .value.green,.tile .value.pos{color:var(--green)}
 .tile .value.red,.tile .value.neg{color:var(--red)}
 .tile .value.oncall{color:var(--oncall)}
-.tile .value.oncall{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
-.tile .value.oncall .oncall-bonus{font-size:0.5em;color:var(--muted);margin-left:auto}
+/* A secondary figure alongside the headline one — the On call bonus, or the
+   manday equivalent of the logged hours. */
+.tile .value.has-note{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+.tile .value .value-note{font-size:0.5em;color:var(--muted);margin-left:auto}
 .tile .value.zero{color:var(--muted)}
 /* Loading shimmer */
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -395,6 +397,8 @@ a.task-card{text-decoration:none;color:inherit}
   border:1px solid rgba(15,23,42,.12);background:#fff;color:var(--muted);font-size:14px;
 }
 .finder-refresh:hover:not(:disabled){background:#f1f3f7;color:var(--ink)}
+/* Silent revalidation behind data that is already listed. */
+.finder-refresh.busy{animation:spin 1s linear infinite;opacity:1}
 .finder-refresh:disabled{opacity:.5;cursor:default}
 
 .finder-list{

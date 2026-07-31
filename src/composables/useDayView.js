@@ -1,7 +1,7 @@
 import { computed } from "vue";
-import { state, workingHours, nowTick } from "../store.js";
+import { state, workingHours, nowTick, mandayHours } from "../store.js";
 import { PX_PER_HOUR } from "../constants.js";
-import { iso, pad, sameDay, startOfDay, timeOfDay, formatHoursMinutes, formatTodayHeader } from "../utils/date.js";
+import { iso, pad, sameDay, startOfDay, timeOfDay, formatHours, formatHoursMinutes, formatTodayHeader } from "../utils/date.js";
 import { cuReady, isOnCallTask } from "./useClickUp.js";
 
 // Timeline block geometry (design tokens): a fixed left gutter for the hour
@@ -124,6 +124,7 @@ export function useDayView(){
 
     const stats = {
       logged: hasClickUp ? formatHoursMinutes(totalLogged) : "–",
+      loggedMandays: hasClickUp && totalLogged > 0 ? `${formatHours(totalLogged / mandayHours.value)} MD` : "",
       goal: goal > 0 ? formatHoursMinutes(goal) : "—",
       remaining: (hasClickUp && goal > 0) ? formatHoursMinutes(remaining) : "—",
       count: hasClickUp ? String(regularEntries.length) : "–",
@@ -159,7 +160,9 @@ export function useDayView(){
     } else {
       // Any other day has no "now" to run to: fill the working window, and stub
       // out a fixed stretch past it when work carried on beyond the window.
-      freeSlots = isWorkday ? freeWindows(busy, work.start, work.end) : [];
+      // Weekends and holidays get slots too — work happens on them, and the day
+      // being off is what the badge and the zero target already say.
+      freeSlots = freeWindows(busy, work.start, work.end);
       if (regularEntries.length){
         const lastEnd = Math.max(...regularEntries.map(endFracOf));
         if (lastEnd > work.end && lastEnd < 24){

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, nextTick } from "vue";
-import { state, saveConfig, setStatus, setCuPill, syncPill, workingHours } from "../store.js";
+import { state, saveConfig, setStatus, setCuPill, syncPill, workingHours, mandayHours } from "../store.js";
 import { pad } from "../utils/date.js";
 import { cuReady, cuLoadAccount, cuLoadTeams, cuLoadFolders, isValidOnCallPattern } from "../composables/useClickUp.js";
 import { isValidPriorityPattern, clearTaskPools } from "../composables/useTaskFinder.js";
@@ -114,6 +114,13 @@ function stepTarget(delta){
   state.config.hoursPerDay = next;
   saveConfig();
   refresh();
+}
+
+// Manday hours — the stats read config reactively, so persisting is enough.
+function stepManday(delta){
+  const next = Math.min(DAILY_MAX, Math.max(DAILY_MIN, +(mandayHours.value + delta).toFixed(1)));
+  state.config.mandayHours = next;
+  saveConfig();
 }
 
 // Working hours — whole hours, start strictly before end. The steppers clamp to
@@ -394,7 +401,7 @@ function disconnectGh(){
             <div class="set-help">
               Hours logged to a ClickUp task whose name matches any of these patterns count as on-call.
               Each row is a regular expression, case-insensitive and matched anywhere in the name —
-              e.g. <code>^oncall-</code> for a prefix, <code>^Oncall-Weekend$</code> for an exact name.
+              e.g. <code>^BAU \| Oncall.*</code>.
             </div>
           </div>
           <div v-if="onCallRows.length" class="list-rows">
@@ -443,7 +450,7 @@ function disconnectGh(){
         <!-- Priority tasks -->
         <div class="set-card">
           <div>
-            <div class="set-label">Priority tasks</div>
+            <div class="set-label">Priority task patterns</div>
             <div class="set-help">
               Tasks whose name matches any of these are pinned to the top of the task picker
               under the Default sort, including ones in the current sprint that aren't assigned
@@ -498,6 +505,18 @@ function disconnectGh(){
             <button type="button" aria-label="Decrease" @click="stepTarget(-0.5)">−</button>
             <div class="val">{{ state.hoursPerDay }} h</div>
             <button type="button" aria-label="Increase" @click="stepTarget(0.5)">+</button>
+          </div>
+        </div>
+
+        <div class="pref-row">
+          <div>
+            <div class="set-label">Manday hours</div>
+            <div class="set-help">Hours in one manday. Logged time is shown in mandays alongside the hours.</div>
+          </div>
+          <div class="stepper">
+            <button type="button" aria-label="Decrease" @click="stepManday(-0.5)">−</button>
+            <div class="val">{{ mandayHours }} h</div>
+            <button type="button" aria-label="Increase" @click="stepManday(0.5)">+</button>
           </div>
         </div>
 
