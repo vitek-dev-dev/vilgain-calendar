@@ -15,11 +15,34 @@ const emptyText = computed(() =>
     ? "No open pull requests authored by you."
     : "Connect GitHub in settings (⚙) to see pull requests you've authored.",
 );
+
+// Row count for the first-load skeleton. PRs are a flat list, so no group heads.
+// Refreshes keep the stale list on screen and only show the tab spinner, so this
+// is only ever seen on an empty view.
+const SKELETON_ROWS = 6;
 </script>
 
 <template>
-  <div class="panel list-panel" :class="{ loading: loading && !prs.length }">
-    <div v-if="!prs.length && !loading" class="list-empty">{{ emptyText }}</div>
+  <div class="panel list-panel fill">
+    <div
+      v-if="loading && !prs.length"
+      class="pr-list"
+      role="status"
+      aria-label="Loading pull requests"
+    >
+      <div v-for="i in SKELETON_ROWS" :key="i" class="pr-card sk-row" aria-hidden="true">
+        <span class="pr-ci sk">&nbsp;</span>
+        <div class="pr-main">
+          <div class="pr-title sk sk-title">&nbsp;</div>
+          <div class="pr-meta">
+            <span class="pr-repo sk sk-meta">&nbsp;</span>
+          </div>
+        </div>
+        <span class="pr-status sk">&nbsp;</span>
+      </div>
+    </div>
+
+    <div v-else-if="!prs.length" class="list-empty">{{ emptyText }}</div>
 
     <div v-else class="pr-list">
       <component
@@ -44,11 +67,6 @@ const emptyText = computed(() =>
         </div>
         <span class="pr-status" :class="p.statusCls">{{ p.statusLabel }}</span>
       </component>
-    </div>
-
-    <div class="loader" role="status" aria-live="polite">
-      <div class="spinner" aria-hidden="true"></div>
-      <div>Loading…</div>
     </div>
   </div>
 </template>

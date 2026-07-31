@@ -4,6 +4,7 @@ export function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 
 export function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 export function pad(n){ return String(n).padStart(2, "0"); }
 export function iso(d){ return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+export function monthKey(d){ return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
 export function sameDay(a, b){
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }

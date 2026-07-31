@@ -147,6 +147,10 @@ function disconnect(){
   state.entries.clear();
   state.onCall.clear();
   state.dayEntries = [];
+  // Drop the loaded-period markers too, so the calendar and day views treat the
+  // next refresh as a first load rather than a silent one.
+  state.entriesPeriod = "";
+  state.dayEntriesKey = "";
   saveConfig();
   tokenInput.value = "";
   syncPill(cuReady());

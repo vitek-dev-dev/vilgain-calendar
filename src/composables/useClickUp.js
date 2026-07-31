@@ -1,5 +1,5 @@
 import { state, setStatus, setCuPill } from "../store.js";
-import { iso } from "../utils/date.js";
+import { iso, monthKey } from "../utils/date.js";
 
 export function cuReady(){ return !!(state.config.token && state.config.teamId); }
 
@@ -79,6 +79,29 @@ export async function cuCreateTimeEntry({ start, stop, duration, description, ta
   return res.json();
 }
 
+// Log a single entry spanning the local clock times `start`–`end` ("HH:MM") on
+// `dateIso` ("YYYY-MM-DD"). An end at or before the start rolls over to the next
+// day, so an overnight range like 16:00–00:00 lands where you'd expect. Shared
+// by the templates cards and the Log time modal.
+export async function cuLogTimeRange({ dateIso, start, end, description, taskId, billable }){
+  if (!cuReady()) throw new Error("Connect ClickUp first");
+  const [y, mo, d] = String(dateIso).split("-").map(Number);
+  const [sh, sm] = String(start).split(":").map(Number);
+  const [eh, em] = String(end).split(":").map(Number);
+  const startMs = new Date(y, mo - 1, d, sh, sm, 0, 0).getTime();
+  let endDate = new Date(y, mo - 1, d, eh, em, 0, 0);
+  if (endDate.getTime() <= startMs) endDate = new Date(y, mo - 1, d + 1, eh, em, 0, 0);
+  const endMs = endDate.getTime();
+  return cuCreateTimeEntry({
+    start: startMs,
+    stop: endMs,
+    duration: endMs - startMs,
+    description,
+    taskId,
+    billable,
+  });
+}
+
 export async function cuLoadAccount(){
   const [u, t] = await Promise.all([cuFetch("/user"), cuFetch("/team")]);
   state.cuUser = u.user;
@@ -86,9 +109,24 @@ export async function cuLoadAccount(){
 }
 
 export async function cuLoadTimeEntries(year, month){
-  state.entries.clear();
-  state.onCall.clear();
-  if (!cuReady()) return;
+  const period = monthKey(new Date(year, month, 1));
+  // Only drop what is on screen when the fetch is for a different month — that
+  // data describes another period and would be wrong here. Re-fetching the month
+  // already displayed keeps it visible until the new data lands, so a background
+  // refresh never blanks the grid (same idea as cuLoadTasks).
+  if (state.entriesPeriod !== period){
+    state.entries.clear();
+    state.onCall.clear();
+    state.entriesPeriod = "";
+  }
+  if (!cuReady()){
+    state.entries.clear();
+    state.onCall.clear();
+    // Resolved for this period — there is simply nothing to show without a
+    // connection, so navigating months should not flash the loader.
+    state.entriesPeriod = period;
+    return;
+  }
   const first = new Date(year, month, 1, 0, 0, 0, 0);
   // Extend the window one extra day so entries that start on the last day of the
   // month but end after midnight (e.g. an On Call shift ending at 00:00) are still
@@ -104,28 +142,41 @@ export async function cuLoadTimeEntries(year, month){
   try {
     const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
     const list = json.data || [];
+    // Bucket into fresh maps first, then swap in one synchronous go — the grid
+    // never renders a half-filled month.
+    const entries = new Map(), onCall = new Map();
     for (const e of list){
       const start = new Date(Number(e.start));
       const key = iso(start);
       const hours = Math.max(0, Number(e.duration) || 0) / 3600000;
       const name = (e.task && e.task.name) || e.description || "";
-      if (isOnCallTask(name)){
-        state.onCall.set(key, (state.onCall.get(key) || 0) + hours);
-      } else {
-        state.entries.set(key, (state.entries.get(key) || 0) + hours);
-      }
+      const bucket = isOnCallTask(name) ? onCall : entries;
+      bucket.set(key, (bucket.get(key) || 0) + hours);
     }
+    state.entries = entries;
+    state.onCall = onCall;
+    state.entriesPeriod = period;
     setCuPill("ok", `ClickUp: ${list.length} entries`);
   } catch (err){
+    // Keep whatever is already on screen rather than emptying the month.
     setCuPill("err", "ClickUp: error");
     setStatus("ClickUp: " + err.message);
   }
 }
 
 export async function cuLoadDayEntries(){
-  state.dayEntries = [];
-  if (!cuReady()) return;
   const d = state.dayCursor;
+  const dayKey = iso(d);
+  // Same rule as the month grid: only clear when we are moving to another day.
+  if (state.dayEntriesKey !== dayKey){
+    state.dayEntries = [];
+    state.dayEntriesKey = "";
+  }
+  if (!cuReady()){
+    state.dayEntries = [];
+    state.dayEntriesKey = dayKey;
+    return;
+  }
   const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
   // Query from the start of the previous day through the end of the next day so a
   // shift that crosses this day's midnight in either direction — e.g. an On Call
@@ -169,8 +220,10 @@ export async function cuLoadDayEntries(){
     }
     entries.sort((a, b) => a.start.getTime() - b.start.getTime());
     state.dayEntries = entries;
+    state.dayEntriesKey = dayKey;
     setCuPill("ok", `ClickUp: ${entries.length} ${entries.length === 1 ? "entry" : "entries"} this day`);
   } catch (err){
+    // Keep the timeline as it is rather than emptying it.
     setCuPill("err", "ClickUp: error");
     setStatus("ClickUp: " + err.message);
   }

@@ -1,9 +1,11 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, watchEffect } from "vue";
 import { cuReady } from "../composables/useClickUp.js";
-import { logTemplate } from "../composables/useTemplatesView.js";
+import { logTemplate, setTemplateTask } from "../composables/useTemplatesView.js";
+import { taskLabels, ensureTaskLabel } from "../composables/useTaskFinder.js";
 import { setStatus } from "../store.js";
 import { iso, formatHours } from "../utils/date.js";
+import TaskFinderModal from "./TaskFinderModal.vue";
 
 // Code-defined time-entry templates, grouped for display. Each group:
 // { name, templates: [{ id, label, icon, taskId, description, billable, start,
@@ -61,6 +63,45 @@ function btnLabel(id){
   }
 }
 
+// ── Task picker ──────────────────────────────────────────────────────────────
+// Templates whose task id comes from src/timeTemplates.js carry no name, so ask
+// ClickUp for one; resolution is cached per id in the finder composable.
+watchEffect(() => {
+  for (const t of allTemplates.value){
+    if (t.task && t.task.id && !t.task.title) ensureTaskLabel(t.task.id);
+  }
+});
+
+const pickerFor = ref(null);
+
+function taskLabel(t){
+  if (!t.task) return "No task";
+  if (t.task.title) return t.task.title;
+  const resolved = taskLabels.get(t.task.id);
+  return resolved ? resolved.title : t.task.id;
+}
+
+// Re-linking makes the card describe a different time entry, so drop the
+// "Logged ✓" state it may be carrying from the previous task.
+function relink(t, task){
+  setTemplateTask(t.taskKey, task);
+  const next = { ...status.value };
+  delete next[t.id];
+  status.value = next;
+}
+
+function onPickTask(task){
+  const t = pickerFor.value;
+  if (!t) return;
+  relink(t, task);
+  setStatus(task ? `“${t.label}” now logs to “${task.title}”.` : `“${t.label}” now logs without a task.`);
+}
+
+function onClearTask(t){
+  relink(t, null);
+  setStatus(`Unlinked the task from “${t.label}”.`);
+}
+
 async function onLog(t){
   if (!connected.value){ setStatus("Connect ClickUp in settings (⚙) first."); return; }
   if (status.value[t.id] === "saving") return;
@@ -107,6 +148,26 @@ async function onLog(t){
             <span class="tpl-ico" aria-hidden="true">{{ t.icon }}</span>
             <div class="task-main">
               <div class="task-title">{{ t.label }}</div>
+              <div class="tpl-task">
+                <button
+                  type="button"
+                  class="tpl-task-btn"
+                  :class="{ empty: !t.task }"
+                  :title="t.task ? `Logs to ${taskLabel(t)} — click to change` : 'Pick a ClickUp task for this template'"
+                  @click="pickerFor = t"
+                >
+                  <span class="tpl-task-ico" aria-hidden="true">{{ t.task ? "🔗" : "＋" }}</span>
+                  <span class="tpl-task-name">{{ t.task ? taskLabel(t) : "Pick task" }}</span>
+                </button>
+                <button
+                  v-if="t.task"
+                  type="button"
+                  class="tpl-task-clear"
+                  aria-label="Unlink task"
+                  title="Unlink task"
+                  @click="onClearTask(t)"
+                >✕</button>
+              </div>
             </div>
 
             <div class="tpl-times">
@@ -145,5 +206,13 @@ async function onLog(t){
     <p v-if="!connected" class="list-empty-note tpl-note">
       Connect ClickUp in settings (⚙) to enable logging.
     </p>
+
+    <TaskFinderModal
+      :open="!!pickerFor"
+      :title="pickerFor ? `Task for “${pickerFor.label}”` : 'Select a ClickUp task'"
+      :selected-id="pickerFor && pickerFor.task ? pickerFor.task.id : ''"
+      @select="onPickTask"
+      @close="pickerFor = null"
+    />
   </div>
 </template>

@@ -31,7 +31,12 @@ body{
   min-height:100vh;
   background:linear-gradient(165deg,#0f1629,#161e3a);
 }
-.app{max-width:1320px;margin:0 auto;padding:8px 26px 40px}
+/* Flex column so a view can claim the leftover viewport height (see
+   .list-panel.fill) while the status line stays pinned below it. */
+.app{
+  max-width:1320px;margin:0 auto;padding:8px 26px 40px;
+  min-height:100vh;display:flex;flex-direction:column;
+}
 
 /* ---------- Tab bar ---------- */
 .tabbar{
@@ -48,10 +53,25 @@ body{
   background:transparent;color:rgba(255,255,255,.55);
   transition:background .15s,color .15s;
 }
+/* Fixed-size slot holding either the emoji or the refresh spinner. Emoji are
+   wider than the spinner and vary between tabs, so pinning the box keeps every
+   tab's width stable — both across tabs and when one swaps to its spinner. */
+.tab .tab-slot{
+  width:18px;height:18px;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;
+}
 .tab .tab-ico{font-size:14px;line-height:1}
+.tab .tab-spin{
+  width:14px;height:14px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.2);border-top-color:currentColor;
+  animation:spin .8s linear infinite;
+}
 .tab:hover{color:rgba(255,255,255,.8)}
 .tab.active{color:#fff;background:rgba(255,255,255,.08);border-bottom-color:var(--accent-2)}
-.tabbar-right{display:flex;align-items:center;gap:12px;padding-bottom:8px}
+/* min-height reserves the .datenav row (34px + the 8px padding) so the tab bar
+   keeps one height on every view — Tasks/PRs show only a title link, and on
+   Templates .view-title is empty, which would otherwise collapse the row. */
+.tabbar-right{display:flex;align-items:center;gap:12px;padding-bottom:8px;min-height:42px}
 .view-title{font-size:14px;font-weight:600;color:rgba(255,255,255,.85)}
 a.view-title-link{display:inline-flex;align-items:center;gap:4px;text-decoration:none;transition:color .12s ease}
 a.view-title-link:hover{color:#fff;text-decoration:underline}
@@ -105,6 +125,7 @@ a.view-title-link .ext-ico{font-size:12px;opacity:.7}
 }
 .tiles.loading .tile:nth-child(3n) .value{width:80%}
 .tiles.loading .tile:nth-child(odd) .value{width:52%}
+
 
 /* ---------- Shared panel ---------- */
 .panel{
@@ -245,25 +266,28 @@ a.tl-block.clickable:focus-visible{outline:2px solid #fff;outline-offset:2px}
 }
 
 /* ---------- Section label (Tasks / PRs) ---------- */
+/* Fixed height: each view's icon glyph resolves to a different fallback font
+   (Apple Color Emoji among them) whose `normal` line-height differs by a few px.
+   Without a pinned height the tallest child sized the row, so the panel below
+   started at a different y on every tab and the page jumped on tab switch. */
 .seclbl{
-  display:flex;align-items:center;gap:8px;
-  font:700 13px system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;margin:0 0 12px;
+  display:flex;align-items:center;gap:8px;height:22px;
+  font:700 13px/22px system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;margin:0 0 12px;
 }
-.seclbl .sec-ico{font-size:14px}
+/* Same fixed-slot trick as .tab .tab-slot, and for the same reason. */
+.seclbl .sec-ico{
+  width:18px;height:18px;flex:none;font-size:14px;line-height:1;
+  display:inline-flex;align-items:center;justify-content:center;
+}
 .secct{
-  font:600 11px system-ui,-apple-system,"Segoe UI",sans-serif;
+  font:600 11px/14px system-ui,-apple-system,"Segoe UI",sans-serif;
   color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);
   border-radius:999px;padding:1px 8px;
 }
-/* Silent-reload hint: a small spinner in the section header shown while stale
-   data stays visible and a background refresh is in flight. */
-.sec-spin{
-  width:13px;height:13px;border-radius:50%;
-  border:2px solid rgba(255,255,255,.2);border-top-color:#fff;
-  animation:spin .8s linear infinite;
-}
 .list-panel{padding:20px 22px}
-.list-panel.loading{min-height:140px}
+/* Tasks / PRs keep a full-height panel whatever the item count, so the surface
+   doesn't resize as the list grows, empties or reloads. */
+.list-panel.fill{flex:1}
 .list-empty{
   padding:40px 20px;text-align:center;color:var(--muted);font-size:14px;line-height:1.5;
   border:1px dashed var(--disabled);border-radius:12px;background:var(--card);
@@ -329,6 +353,226 @@ a.task-card{text-decoration:none;color:inherit}
 .tpl-card.error .tpl-log-btn{background:var(--red);border-color:var(--red)}
 .tpl-note{margin-top:14px}
 
+/* Linked ClickUp task on a template card */
+.tpl-task{display:flex;align-items:center;gap:4px;margin-top:5px;min-width:0}
+.tpl-task-btn{
+  display:flex;align-items:center;gap:5px;min-width:0;max-width:100%;
+  padding:2px 8px 2px 6px;border-radius:999px;cursor:pointer;
+  border:1px solid rgba(109,93,240,.25);background:rgba(109,93,240,.08);
+  font:600 11px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--accent);
+}
+.tpl-task-btn:hover{background:rgba(109,93,240,.14)}
+.tpl-task-btn.empty{border-style:dashed;border-color:var(--disabled);background:none;color:var(--faint)}
+.tpl-task-btn.empty:hover{border-color:var(--accent);color:var(--accent)}
+.tpl-task-ico{font-size:10px;line-height:1;flex:none}
+.tpl-task-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tpl-task-clear{
+  flex:none;width:18px;height:18px;border:none;border-radius:50%;cursor:pointer;
+  background:none;color:var(--faint);font-size:10px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+}
+.tpl-task-clear:hover{background:#fef2f2;color:var(--red)}
+
+/* ---------- Task finder modal ---------- */
+.finder-backdrop{
+  position:fixed;inset:0;z-index:80;
+  background:rgba(8,12,28,.55);backdrop-filter:blur(3px);
+  visibility:hidden;opacity:0;
+  transition:opacity .18s ease,visibility 0s linear .18s;
+}
+.finder-backdrop.open{visibility:visible;opacity:1;transition:opacity .18s ease}
+.finder{
+  position:fixed;z-index:90;
+  top:50%;left:50%;transform:translate(-50%,calc(-50% + 8px));
+  width:560px;max-width:calc(100% - 32px);height:min(620px,86vh);
+  background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(8,12,28,.5);
+  display:flex;flex-direction:column;overflow:hidden;color:var(--ink);
+  visibility:hidden;opacity:0;
+  transition:opacity .18s ease,transform .18s ease,visibility 0s linear .18s;
+}
+.finder.open{visibility:visible;opacity:1;transform:translate(-50%,-50%);transition:opacity .18s ease,transform .18s ease}
+.finder-head{
+  flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:18px 20px 12px;
+}
+.finder-head h2{margin:0;font-size:16px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* The search + filters + list column, hosted either by the finder modal or by
+   the Log time overlay's right-hand card. */
+.tf-panel{flex:1;min-height:0;display:flex;flex-direction:column}
+
+.finder-search{flex:none;position:relative;padding:0 20px}
+.finder-search-ico{position:absolute;left:32px;top:50%;transform:translateY(-50%);font-size:12px;opacity:.5;pointer-events:none}
+.finder-search input{
+  width:100%;padding:11px 12px 11px 34px;border-radius:11px;outline:none;
+  border:1px solid rgba(15,23,42,.14);background:#fff;
+  font-size:13.5px;font-family:inherit;color:var(--ink);
+}
+.finder-search input:focus{border-color:var(--accent)}
+
+.finder-filters{flex:none;display:flex;align-items:center;gap:10px;padding:12px 20px}
+.finder-scope-note{
+  padding:4px 10px;border-radius:999px;background:#f1f3f7;
+  font:600 11.5px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);
+}
+.finder-check{
+  display:flex;align-items:center;gap:6px;cursor:pointer;
+  font:600 11.5px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);
+}
+.finder-check input{accent-color:var(--accent);margin:0}
+.finder-refresh{
+  margin-left:auto;flex:none;width:30px;height:30px;border-radius:8px;cursor:pointer;
+  border:1px solid rgba(15,23,42,.12);background:#fff;color:var(--muted);font-size:14px;
+}
+.finder-refresh:hover:not(:disabled){background:#f1f3f7;color:var(--ink)}
+.finder-refresh:disabled{opacity:.5;cursor:default}
+
+.finder-list{
+  flex:1;min-height:0;overflow-y:auto;
+  padding:4px 12px 12px;display:flex;flex-direction:column;gap:2px;
+  border-top:1px solid rgba(15,23,42,.07);
+}
+.finder-row{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:9px 10px;border:none;border-radius:9px;background:none;cursor:pointer;
+  border-left:2px solid transparent;
+}
+.finder-row.active{background:rgba(109,93,240,.09)}
+.finder-row.current{border-left-color:var(--accent)}
+.finder-row.none{border-bottom:1px solid rgba(15,23,42,.07);border-radius:9px 9px 0 0;margin-bottom:2px}
+.finder-none-ico{flex:none;width:9px;text-align:center;color:var(--faint);font-size:12px}
+.finder-dot{width:9px;height:9px;border-radius:3px;flex:none}
+.finder-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.finder-title{
+  font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.finder-sub{
+  display:flex;align-items:center;gap:6px;min-width:0;
+  font:500 11px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--faint);
+}
+.finder-sub>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.finder-sprint{
+  display:inline-flex;align-items:center;gap:4px;flex:none;max-width:180px;
+  padding:1px 7px;border-radius:999px;
+  background:rgba(124,58,237,.1);color:var(--oncall);
+  font:600 10.5px system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.finder-sprint>span{font-size:9px;line-height:1}
+/* Purple = the sprint running today. Amber = the task's newest sprint, already
+   ended. Grey = no sprint at all, showing the folder instead. */
+.finder-sprint.past{background:rgba(180,83,9,.1);color:var(--amber)}
+.finder-sprint.folder{background:#eef1f6;color:var(--muted)}
+.finder-sprint .finder-sprint-more{
+  font-size:9px;opacity:.7;padding-left:1px;
+  font-variant-numeric:tabular-nums;
+}
+.finder-status{color:var(--muted);font-weight:600}
+.finder-cid{font-variant-numeric:tabular-nums}
+.finder-tag{
+  flex:none;font:600 10px system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:2px 7px;border-radius:999px;background:#eef1f6;color:var(--muted);
+}
+.finder-tag.current{background:rgba(109,93,240,.12);color:var(--accent)}
+.finder-msg{padding:14px 10px;font-size:12.5px;color:var(--faint)}
+.finder-msg-err{color:var(--red)}
+
+.finder-foot{
+  flex:none;padding:10px 20px 14px;border-top:1px solid rgba(15,23,42,.07);
+  font-size:11.5px;color:var(--faint);line-height:1.4;
+}
+
+/* ---------- Log time drawer ---------- */
+/* Off-canvas from the right: the form keeps its natural height at the top and
+   the task search fills whatever is left, so both stay on screen at once. */
+.lt-overlay{
+  position:fixed;inset:0;z-index:76;
+  background:rgba(8,12,28,.55);backdrop-filter:blur(3px);
+  visibility:hidden;opacity:0;
+  transition:opacity .2s ease,visibility 0s linear .2s;
+}
+.lt-overlay.open{visibility:visible;opacity:1;transition:opacity .2s ease}
+.lt-drawer{
+  position:fixed;top:0;right:0;bottom:0;z-index:78;
+  /* 43% of the viewport, but never narrower than the form needs. */
+  width:max(620px,43vw);max-width:100%;
+  background:#fff;border-radius:18px 0 0 18px;
+  box-shadow:-24px 0 60px rgba(8,12,28,.5);
+  display:flex;flex-direction:column;overflow:hidden;color:var(--ink);
+  transform:translateX(100%);visibility:hidden;
+  transition:transform .2s ease,visibility 0s linear .2s;
+}
+.lt-drawer.open{transform:none;visibility:visible;transition:transform .2s ease}
+/* Natural height below the task list — it must not stretch to fill the drawer. */
+.lt-when-body{
+  flex:none;padding:14px 20px 16px;display:flex;flex-direction:column;gap:14px;
+  border-top:1px solid rgba(15,23,42,.07);
+}
+
+/* Selected task, echoed from the picker above */
+.lt-picked{
+  padding:9px 12px;border-radius:10px;
+  border:1px solid rgba(15,23,42,.14);background:var(--panel);
+  display:flex;flex-direction:column;gap:4px;
+}
+.lt-picked-name{
+  font:600 13.5px system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.lt-picked-sub{display:flex;align-items:center;gap:6px;min-width:0;font-size:11px;color:var(--faint)}
+
+.lt-field{display:flex;flex-direction:column;min-width:0;flex:1}
+.lt-row{display:flex;gap:10px}
+.lt-narrow{flex:none;width:104px}
+.lt-input{
+  width:100%;padding:10px 12px;border-radius:10px;outline:none;
+  border:1px solid rgba(15,23,42,.14);background:#fff;
+  font:500 13.5px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);
+}
+.lt-input[type=time]{font-variant-numeric:tabular-nums;font-weight:600}
+.lt-input:focus{border-color:var(--accent)}
+.lt-input:disabled{opacity:.6}
+
+.lt-hint{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.4}
+.lt-error{font-size:12px;color:var(--red);line-height:1.4}
+
+/* Sits in the date/from/to row, aligned to the inputs rather than their labels. */
+.lt-summary{display:flex;align-items:center;gap:8px;flex:none;align-self:flex-end;padding-bottom:9px}
+.lt-duration{
+  font:700 15px system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-variant-numeric:tabular-nums;color:var(--ink);
+}
+.lt-overnight{
+  font:600 10.5px system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:2px 8px;border-radius:999px;background:rgba(180,83,9,.1);color:var(--amber);
+}
+.lt-foot{
+  flex:none;display:flex;justify-content:flex-end;gap:8px;
+  padding:14px 20px;border-top:1px solid rgba(15,23,42,.07);
+}
+.lt-cancel{
+  padding:10px 16px;border-radius:10px;cursor:pointer;
+  border:1px solid rgba(15,23,42,.12);background:#fff;color:var(--muted);
+  font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.lt-cancel:hover{background:#f1f3f7;color:var(--ink)}
+.primary-btn:disabled{opacity:.5;cursor:default;filter:none}
+
+/* ---------- Log time FAB ---------- */
+.logtime-fab{
+  /* Bottom-left, opposite the settings FAB — no longer stacked above it. */
+  position:fixed;left:26px;bottom:26px;z-index:50;
+  height:44px;padding:0 18px;border-radius:999px;border:none;cursor:pointer;
+  background:#fff;color:var(--accent);
+  font:700 13px system-ui,-apple-system,"Segoe UI",sans-serif;
+  display:flex;align-items:center;gap:7px;
+  box-shadow:0 8px 24px rgba(8,12,28,.35);
+  transition:transform .15s ease,box-shadow .15s ease;
+}
+.logtime-fab:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(8,12,28,.45)}
+.logtime-fab:active{transform:translateY(0)}
+.logtime-fab:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
 /* ---------- Pull requests ---------- */
 .pr-list{display:flex;flex-direction:column;gap:9px}
 .pr-card{
@@ -346,7 +590,14 @@ a.pr-card{text-decoration:none;color:inherit}
 .pr-ci.running{color:var(--amber)}
 .pr-main{flex:1;min-width:0}
 .pr-title{font:600 13.5px system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.35;color:var(--ink)}
-.pr-meta{display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap}
+/* Fixed line box + min-height: the 💬 in .pr-comments is a colour emoji whose
+   natural line box is ~5px taller than the text beside it, and .pr-comments is
+   conditional — so without this a PR with comments rendered a taller card than one
+   without, and the skeleton row could not match either. Now every card agrees. */
+.pr-meta{
+  display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;
+  line-height:14px;min-height:14px;
+}
 .pr-repo{font:600 11px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);font-variant-numeric:tabular-nums}
 .pr-age,.pr-comments{font-size:11px;color:var(--faint)}
 .pr-status{
@@ -511,9 +762,47 @@ a.pr-card{text-decoration:none;color:inherit}
 /* ---------- Status line ---------- */
 .status{margin-top:12px;font-size:12px;color:rgba(255,255,255,.45);min-height:16px}
 
+/* ---------- Skeleton rows (Tasks / PRs first load) ---------- */
+/* Same technique as the stat-tile shimmer near the top of this file: the skeleton
+   markup uses the *real* row classes and a &nbsp; placeholder, then .sk hides the
+   text with color:transparent and paints the shimmer as the element's own
+   background. Height therefore comes from the real font metrics and padding, so a
+   skeleton row is exactly as tall as the loaded row it stands in for and the list
+   doesn't shift when the data lands. Must stay after the task, PR and group rules
+   above so the colour override wins on equal specificity. */
+.sk{
+  color:transparent;border-radius:6px;
+  background:linear-gradient(90deg,#e5e9f0 25%,#f1f4f9 50%,#e5e9f0 75%);
+  background-size:200% 100%;animation:shimmer 1.4s linear infinite;
+}
+/* Shapes that aren't plain bars: keep the real silhouette. */
+.group-dot.sk{border-radius:3px}
+.group-count.sk,.pr-status.sk{border-radius:999px}
+/* The status pill's real variants add a 1px border — keep the box identical. */
+.pr-status.sk{border:1px solid transparent;width:66px}
+.pr-ci.sk{width:14px;border-radius:50%}
+.group-name.sk{width:104px}
+.group-count.sk{width:22px}
+/* One bar stands in for the tracked/estimate pair — .task-time is never the
+   tallest cell in the card, so this cannot change the row height. */
+.task-tracked.sk{width:44px}
+/* Ragged widths so the stack doesn't read as a table. */
+.sk-row:nth-child(3n+1) .sk-title{width:58%}
+.sk-row:nth-child(3n+2) .sk-title{width:76%}
+.sk-row:nth-child(3n) .sk-title{width:44%}
+.sk-row:nth-child(odd) .sk-meta{width:34%}
+.sk-row:nth-child(even) .sk-meta{width:46%}
+@media (prefers-reduced-motion:reduce){
+  .sk{animation:none}
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width:900px){
   .tiles.cols-6,.tiles.cols-5{grid-template-columns:repeat(3,1fr)}
+}
+/* Full-bleed drawer once it covers the whole width. */
+@media (max-width:660px){
+  .lt-drawer{border-radius:0}
 }
 @media (max-width:640px){
   .app{padding:8px 14px 32px}

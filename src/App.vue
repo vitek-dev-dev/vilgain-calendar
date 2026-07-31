@@ -12,6 +12,7 @@ import { useTemplatesView } from "./composables/useTemplatesView.js";
 
 import AppHeader from "./components/AppHeader.vue";
 import SettingsModal from "./components/SettingsModal.vue";
+import LogTimeModal from "./components/LogTimeModal.vue";
 import StatsBar from "./components/StatsBar.vue";
 import MonthGrid from "./components/MonthGrid.vue";
 import DayTimeline from "./components/DayTimeline.vue";
@@ -26,6 +27,7 @@ const { model: prsModel } = usePRsView();
 const { model: templatesModel } = useTemplatesView();
 
 const settingsOpen = ref(false);
+const logTimeOpen = ref(false);
 
 function onKeydown(e){
   if (e.key === "Escape" && settingsOpen.value){
@@ -34,6 +36,14 @@ function onKeydown(e){
     return;
   }
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  // "l" opens the log dialog from any view; the modals own Escape themselves.
+  if (!logTimeOpen.value && !settingsOpen.value && (e.key === "l" || e.key === "L") && !e.metaKey && !e.ctrlKey && !e.altKey){
+    logTimeOpen.value = true;
+    e.preventDefault();
+    return;
+  }
+  // Don't navigate the calendar underneath an open overlay.
+  if (logTimeOpen.value || settingsOpen.value) return;
   if (state.view === "day"){
     if (e.key === "ArrowLeft") shiftDay(-1);
     else if (e.key === "ArrowRight") shiftDay(1);
@@ -90,6 +100,16 @@ onUnmounted(() => {
     <AppHeader />
 
     <SettingsModal :open="settingsOpen" @close="settingsOpen = false" />
+    <LogTimeModal :open="logTimeOpen" @close="logTimeOpen = false" />
+
+    <button
+      class="logtime-fab"
+      type="button"
+      title="Log time to ClickUp (L)"
+      @click="logTimeOpen = true"
+    >
+      <span aria-hidden="true">⏱</span> Log time
+    </button>
 
     <button
       class="settings-fab"
@@ -118,7 +138,6 @@ onUnmounted(() => {
         <span class="sec-ico" aria-hidden="true">☰</span>
         ClickUp tasks — assigned to me
         <span class="secct">{{ tasksModel.count }}</span>
-        <span v-if="isLoading && tasksModel.count" class="sec-spin" role="status" aria-label="Refreshing"></span>
       </div>
       <TasksView :groups="tasksModel.groups" :loading="isLoading" />
     </template>
@@ -129,7 +148,6 @@ onUnmounted(() => {
         <span class="sec-ico" aria-hidden="true">⌥</span>
         GitHub pull requests — authored by me
         <span class="secct">{{ prsModel.count }}</span>
-        <span v-if="isLoading && prsModel.count" class="sec-spin" role="status" aria-label="Refreshing"></span>
       </div>
       <PRsView :prs="prsModel.prs" :loading="isLoading" />
     </template>

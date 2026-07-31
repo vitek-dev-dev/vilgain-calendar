@@ -14,11 +14,44 @@ const emptyText = computed(() =>
     ? "No tasks are assigned to you in this workspace."
     : "Connect ClickUp in settings (⚙) to see your assigned tasks, grouped by status.",
 );
+
+// Card counts for the first-load skeleton — two status groups, so the placeholder
+// has the shape of a real grouped list. Refreshes keep the stale list on screen
+// and only show the tab spinner, so this is only ever seen on an empty view.
+const SKELETON_GROUPS = [4, 3];
 </script>
 
 <template>
-  <div class="panel list-panel" :class="{ loading: loading && !groups.length }">
-    <div v-if="!groups.length && !loading" class="list-empty">{{ emptyText }}</div>
+  <div class="panel list-panel fill">
+    <div
+      v-if="loading && !groups.length"
+      class="task-groups"
+      role="status"
+      aria-label="Loading tasks"
+    >
+      <div v-for="(cards, gi) in SKELETON_GROUPS" :key="gi" class="task-group" aria-hidden="true">
+        <div class="group-head">
+          <span class="group-dot sk"></span>
+          <span class="group-name sk">&nbsp;</span>
+          <span class="group-count sk">&nbsp;</span>
+        </div>
+        <div class="task-cards">
+          <div v-for="i in cards" :key="i" class="task-card sk-row">
+            <div class="task-main">
+              <div class="task-title sk sk-title">&nbsp;</div>
+              <div class="task-meta">
+                <span class="task-prio sk sk-meta">&nbsp;</span>
+              </div>
+            </div>
+            <div class="task-time">
+              <div class="task-tracked sk">&nbsp;</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="!groups.length" class="list-empty">{{ emptyText }}</div>
 
     <div v-else class="task-groups">
       <div v-for="g in groups" :key="g.name" class="task-group">
@@ -53,11 +86,6 @@ const emptyText = computed(() =>
           </component>
         </div>
       </div>
-    </div>
-
-    <div class="loader" role="status" aria-live="polite">
-      <div class="spinner" aria-hidden="true"></div>
-      <div>Loading…</div>
     </div>
   </div>
 </template>

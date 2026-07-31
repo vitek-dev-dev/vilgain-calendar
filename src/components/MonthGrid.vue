@@ -1,5 +1,5 @@
 <script setup>
-import { isLoading } from "../store.js";
+import { isLoading, monthLoaded } from "../store.js";
 import { WEEKDAYS_SHORT } from "../constants.js";
 import { openDay } from "../composables/useCalendar.js";
 
@@ -24,7 +24,7 @@ function onCellKeydown(e, date){
 </script>
 
 <template>
-  <div class="panel cal-panel" :class="{ loading: isLoading }" aria-live="polite">
+  <div class="panel cal-panel" :class="{ loading: isLoading && !monthLoaded }" aria-live="polite">
     <div class="cal-row cal-head">
       <div class="hd-faint">W</div>
       <div v-for="(w, i) in WEEKDAYS_SHORT" :key="w" :class="{ we: i >= 5 }">{{ w }}</div>

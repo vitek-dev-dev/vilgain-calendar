@@ -1,5 +1,5 @@
 <script setup>
-import { isLoading } from "../store.js";
+import { isLoading, monthLoaded } from "../store.js";
 
 defineProps({
   stats: { type: Object, required: true },
@@ -7,7 +7,7 @@ defineProps({
 </script>
 
 <template>
-  <section class="tiles cols-6" :class="{ loading: isLoading }">
+  <section class="tiles cols-6" :class="{ loading: isLoading && !monthLoaded }">
     <div class="tile">
       <div class="label">Weekend / Holidays</div>
       <div class="value">{{ stats.weekendDays }} / {{ stats.holidayOnWeekday }}</div>

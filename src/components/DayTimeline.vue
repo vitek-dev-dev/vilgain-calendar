@@ -1,5 +1,5 @@
 <script setup>
-import { isLoading } from "../store.js";
+import { isLoading, dayLoaded } from "../store.js";
 
 defineProps({
   model: { type: Object, required: true },
@@ -8,7 +8,7 @@ defineProps({
 
 <template>
   <div>
-    <section class="tiles" :class="[model.stats.onCallShow ? 'cols-6' : 'cols-5', { loading: isLoading }]">
+    <section class="tiles" :class="[model.stats.onCallShow ? 'cols-6' : 'cols-5', { loading: isLoading && !dayLoaded }]">
       <div class="tile"><div class="label">Logged</div><div class="value">{{ model.stats.logged }}</div></div>
       <div class="tile"><div class="label">Target</div><div class="value">{{ model.stats.goal }}</div></div>
       <div class="tile"><div class="label">Remaining</div><div class="value green">{{ model.stats.remaining }}</div></div>
@@ -17,7 +17,7 @@ defineProps({
       <div v-if="model.stats.onCallShow" class="tile"><div class="label">On call</div><div class="value oncall">{{ model.stats.onCall }}</div></div>
     </section>
 
-    <section class="panel day-panel" :class="{ loading: isLoading }" aria-label="Day timeline">
+    <section class="panel day-panel" :class="{ loading: isLoading && !dayLoaded }" aria-label="Day timeline">
       <div class="day-badge-row">
         <span class="day-badge" :class="model.badge.cls">{{ model.badge.label }}</span>
       </div>

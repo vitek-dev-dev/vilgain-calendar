@@ -10,7 +10,9 @@
 //                Groups appear in the order they first show up in this list.
 //   taskId       ClickUp task id the time is attached to. (optional)
 //                Find it in the task URL: app.clickup.com/t/<taskId>. Leave "" (or
-//                omit) for a task-less, description-only entry.
+//                omit) for a task-less, description-only entry — the "Pick task"
+//                button on each card sets it from the UI, and once used that
+//                choice (stored in this browser) wins over the value here.
 //   description  Text stored on the entry. (optional; defaults to label)
 //   billable     Whether the entry is billable. (optional; default false)
 //   icon         Emoji shown on the card. (optional)
