@@ -3,7 +3,7 @@ import { LS_KEY, VIEW_LS_KEY } from "./constants.js";
 import { startOfMonth, startOfDay } from "./utils/date.js";
 
 export function loadConfig(){
-  const defaults = { token: "", teamId: "", assigneeId: "", hoursPerDay: 8, onCallTasks: [], excludeStatuses: [], githubToken: "", githubOrg: "" };
+  const defaults = { token: "", teamId: "", assigneeId: "", hoursPerDay: 8, workStartHour: 8, workEndHour: 16, onCallTasks: [], excludeStatuses: [], githubToken: "", githubOrg: "" };
   try {
     const parsed = JSON.parse(localStorage.getItem(LS_KEY)) || {};
     return { ...defaults, ...parsed };
@@ -49,6 +49,20 @@ export const state = reactive({
 });
 
 export const isLoading = computed(() => state.loading > 0);
+
+function clampHour(v, fallback){
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(24, Math.max(0, n)) : fallback;
+}
+
+// The configured working-hours window, normalized to whole hours with
+// start < end. Both the settings UI and the day timeline read this so a
+// malformed stored value can never produce an inverted window.
+export const workingHours = computed(() => {
+  const start = clampHour(state.config.workStartHour, 8);
+  const end = clampHour(state.config.workEndHour, 16);
+  return end > start ? { start, end } : { start, end: Math.min(24, start + 1) };
+});
 
 export function saveConfig(){ localStorage.setItem(LS_KEY, JSON.stringify(state.config)); }
 export function setStatus(msg){ state.status = msg || ""; }

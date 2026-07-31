@@ -34,6 +34,18 @@ defineProps({
           <span class="lbl">{{ row.label }}</span>
         </div>
 
+        <div
+          v-for="slot in model.timeline.placeholders"
+          :key="slot.id"
+          class="tl-free"
+          :class="{ short: slot.short }"
+          :style="{ top: slot.top + 'px', height: slot.height + 'px', left: slot.left, width: slot.width }"
+          :title="slot.tooltip"
+        >
+          <span class="tf-range">{{ slot.rangeText }}</span>
+          <span class="tf-meta">{{ slot.durationText }} free</span>
+        </div>
+
         <component
           :is="block.tag"
           v-for="block in model.timeline.blocks"

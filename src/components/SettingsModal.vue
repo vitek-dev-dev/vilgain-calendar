@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from "vue";
-import { state, saveConfig, setStatus, setCuPill, syncPill } from "../store.js";
+import { state, saveConfig, setStatus, setCuPill, syncPill, workingHours } from "../store.js";
+import { pad } from "../utils/date.js";
 import { cuReady, cuLoadAccount, isValidOnCallPattern } from "../composables/useClickUp.js";
 import { ghReady, ghLoadAccount, ghLoadPRs } from "../composables/useGitHub.js";
 import { refresh } from "../composables/useCalendar.js";
@@ -76,6 +77,24 @@ function stepTarget(delta){
   refresh();
 }
 
+// Working hours — whole hours, start strictly before end. The steppers clamp to
+// the neighbouring bound so the window can never invert.
+const workStartLabel = computed(() => `${pad(workingHours.value.start)}:00`);
+const workEndLabel = computed(() => `${pad(workingHours.value.end)}:00`);
+
+function stepWorkStart(delta){
+  const { start, end } = workingHours.value;
+  state.config.workStartHour = Math.min(end - 1, Math.max(0, start + delta));
+  state.config.workEndHour = end;
+  saveConfig();
+}
+function stepWorkEnd(delta){
+  const { start, end } = workingHours.value;
+  state.config.workStartHour = start;
+  state.config.workEndHour = Math.min(24, Math.max(start + 1, end + delta));
+  saveConfig();
+}
+
 // On-call task patterns (row editor) — persist trimmed, non-empty values.
 // Patterns that don't compile are kept (so the user can fix a typo) but flagged.
 function persistOnCall(){
@@ -121,7 +140,8 @@ async function connect(){
 }
 
 function disconnect(){
-  state.config = { token: "", teamId: "", assigneeId: "", hoursPerDay: state.hoursPerDay, onCallTasks: state.config.onCallTasks, excludeStatuses: state.config.excludeStatuses, githubToken: state.config.githubToken, githubOrg: state.config.githubOrg };
+  // Clear only the ClickUp credentials — every other preference survives.
+  Object.assign(state.config, { token: "", teamId: "", assigneeId: "", hoursPerDay: state.hoursPerDay });
   state.cuUser = null;
   state.cuTeams = [];
   state.entries.clear();
@@ -351,6 +371,26 @@ function disconnectGh(){
             <button type="button" aria-label="Decrease" @click="stepTarget(-0.5)">−</button>
             <div class="val">{{ state.hoursPerDay }} h</div>
             <button type="button" aria-label="Increase" @click="stepTarget(0.5)">+</button>
+          </div>
+        </div>
+
+        <div class="pref-row">
+          <div>
+            <div class="set-label">Working hours</div>
+            <div class="set-help">The window the day timeline fills with free-slot placeholders.</div>
+          </div>
+          <div class="work-hours">
+            <div class="stepper">
+              <button type="button" aria-label="Decrease start hour" @click="stepWorkStart(-1)">−</button>
+              <div class="val">{{ workStartLabel }}</div>
+              <button type="button" aria-label="Increase start hour" @click="stepWorkStart(1)">+</button>
+            </div>
+            <span class="work-hours-dash" aria-hidden="true">–</span>
+            <div class="stepper">
+              <button type="button" aria-label="Decrease end hour" @click="stepWorkEnd(-1)">−</button>
+              <div class="val">{{ workEndLabel }}</div>
+              <button type="button" aria-label="Increase end hour" @click="stepWorkEnd(1)">+</button>
+            </div>
           </div>
         </div>
       </template>
