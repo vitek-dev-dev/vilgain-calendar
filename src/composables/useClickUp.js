@@ -80,8 +80,7 @@ export async function cuCreateTimeEntry({ start, stop, duration, description, ta
 
 // Log a single entry spanning the local clock times `start`–`end` ("HH:MM") on
 // `dateIso` ("YYYY-MM-DD"). An end at or before the start rolls over to the next
-// day, so an overnight range like 16:00–00:00 lands where you'd expect. Shared
-// by the templates cards and the Log time modal.
+// day, so an overnight range like 16:00–00:00 lands where you'd expect.
 export async function cuLogTimeRange({ dateIso, start, end, description, taskId, billable }){
   if (!cuReady()) throw new Error("Connect ClickUp first");
   const [y, mo, d] = String(dateIso).split("-").map(Number);
@@ -136,6 +135,69 @@ export async function cuMyUserId(){
   return state.cuUser ? String(state.cuUser.id) : "";
 }
 
+// Every Folder in the workspace, for the Sprint folder picker in settings.
+// Cached per workspace and only ever loaded when that settings tab is opened —
+// it costs one request per Space.
+let foldersCache = null; // { teamId, folders }
+
+export async function cuLoadFolders(){
+  const teamId = String(state.config.teamId || "");
+  if (!teamId) return [];
+  if (foldersCache && foldersCache.teamId === teamId) return foldersCache.folders;
+  const spaces = (await cuFetch(`/team/${teamId}/space`, { archived: "false" })).spaces || [];
+  const perSpace = await Promise.all(spaces.map(s =>
+    cuFetch(`/space/${s.id}/folder`, { archived: "false" })
+      .then(j => (j.folders || []).map(f => ({
+        id: String(f.id),
+        name: f.name || "",
+        space: s.name || "",
+      })))
+      .catch(() => []),
+  ));
+  const folders = perSpace.flat()
+    .sort((a, b) => (a.space + a.name).localeCompare(b.space + b.name));
+  foldersCache = { teamId, folders };
+  return folders;
+}
+
+// Per-task totals for a month: taskId -> { hours, last }. Keyed by "YYYY-MM" and
+// filled for free whenever the month grid loads its entries — the picker sorts
+// by it without a fetch of its own. Only a month the calendar never visited
+// costs a request (cuTaskStats below).
+const taskStatsByPeriod = new Map();
+
+function bucketTaskStats(list){
+  const stats = new Map();
+  for (const e of list){
+    const id = e.task && e.task.id;
+    if (!id) continue;
+    const cur = stats.get(id) || { hours: 0, last: 0 };
+    cur.hours += Math.max(0, Number(e.duration) || 0) / 3600000;
+    cur.last = Math.max(cur.last, Number(e.start) || 0);
+    stats.set(id, cur);
+  }
+  return stats;
+}
+
+// Time-entry totals per task for the given month, served from what the calendar
+// already loaded when possible.
+export async function cuTaskStats(year, month){
+  const period = monthKey(new Date(year, month, 1));
+  if (taskStatsByPeriod.has(period)) return taskStatsByPeriod.get(period);
+  if (!cuReady()) return new Map();
+  const first = new Date(year, month, 1, 0, 0, 0, 0);
+  const last = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, {
+    start_date: String(first.getTime() - 1),
+    end_date: String(last.getTime()),
+  });
+  const stats = bucketTaskStats(json.data || []);
+  taskStatsByPeriod.set(period, stats);
+  return stats;
+}
+
+export function clearTaskStats(){ taskStatsByPeriod.clear(); }
+
 export async function cuLoadTimeEntries(year, month){
   const period = monthKey(new Date(year, month, 1));
   // Only drop what is on screen when the fetch is for a different month — that
@@ -169,6 +231,9 @@ export async function cuLoadTimeEntries(year, month){
   try {
     const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
     const list = json.data || [];
+    // The picker's "most / last worked on" sorts read this, so capture it while
+    // the month's entries are in hand rather than fetching them again.
+    taskStatsByPeriod.set(period, bucketTaskStats(list));
     // Bucket into fresh maps first, then swap in one synchronous go — the grid
     // never renders a half-filled month.
     const entries = new Map(), onCall = new Map();

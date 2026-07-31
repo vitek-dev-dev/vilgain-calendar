@@ -1,13 +1,13 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
-import { state, setStatus, syncPill, viewFromHash, isLoading } from "./store.js";
+import { state, setStatus, syncPill, viewFromHash, isLoading, nowTick, NOW_TICK_MS } from "./store.js";
+import { iso } from "./utils/date.js";
 import { cuReady, cuLoadUser } from "./composables/useClickUp.js";
 import { setView, shiftMonth, shiftDay } from "./composables/useCalendar.js";
 import { useMonthView } from "./composables/useMonthView.js";
 import { useDayView } from "./composables/useDayView.js";
 import { useTasksView } from "./composables/useTasksView.js";
 import { usePRsView } from "./composables/usePRsView.js";
-import { useTemplatesView } from "./composables/useTemplatesView.js";
 
 import AppHeader from "./components/AppHeader.vue";
 import SettingsModal from "./components/SettingsModal.vue";
@@ -17,16 +17,27 @@ import MonthGrid from "./components/MonthGrid.vue";
 import DayTimeline from "./components/DayTimeline.vue";
 import TasksView from "./components/TasksView.vue";
 import PRsView from "./components/PRsView.vue";
-import TemplatesView from "./components/TemplatesView.vue";
 
 const { model: monthModel } = useMonthView();
 const { model: dayModel } = useDayView();
 const { model: tasksModel } = useTasksView();
 const { model: prsModel } = usePRsView();
-const { model: templatesModel } = useTemplatesView();
 
 const settingsOpen = ref(false);
 const logTimeOpen = ref(false);
+// Seed values for the Log time drawer, replaced each time it is opened so a
+// previous slot's range never leaks into a plain "Log time" click.
+const logTimePreset = ref({});
+
+function openLogTime(preset){
+  logTimePreset.value = preset || {};
+  logTimeOpen.value = true;
+}
+
+// A free slot on the day timeline logs against that exact window on that day.
+function onLogSlot({ start, end }){
+  openLogTime({ dateIso: iso(state.dayCursor), start, end });
+}
 
 function onKeydown(e){
   if (e.key === "Escape" && settingsOpen.value){
@@ -37,7 +48,7 @@ function onKeydown(e){
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
   // "l" opens the log dialog from any view; the modals own Escape themselves.
   if (!logTimeOpen.value && !settingsOpen.value && (e.key === "l" || e.key === "L") && !e.metaKey && !e.ctrlKey && !e.altKey){
-    logTimeOpen.value = true;
+    openLogTime();
     e.preventDefault();
     return;
   }
@@ -54,6 +65,8 @@ function onKeydown(e){
   }
 }
 
+let nowTimer = null;
+
 function onHashChange(){
   const v = viewFromHash();
   if (v && v !== state.view) setView(v, { skipHash: true });
@@ -69,6 +82,9 @@ onMounted(async () => {
 
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("hashchange", onHashChange);
+  // Keeps the day timeline's now line and trailing free slot moving without a
+  // reload. Only the clock is republished — no data is refetched.
+  nowTimer = setInterval(() => { nowTick.value = Date.now(); }, NOW_TICK_MS);
 
   // Only the ClickUp *identity* is loaded here — task queries are scoped by the
   // user's id, so it is needed before any data lands. The workspace list
@@ -88,6 +104,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown);
   window.removeEventListener("hashchange", onHashChange);
+  clearInterval(nowTimer);
 });
 </script>
 
@@ -96,13 +113,13 @@ onUnmounted(() => {
     <AppHeader />
 
     <SettingsModal :open="settingsOpen" @close="settingsOpen = false" />
-    <LogTimeModal :open="logTimeOpen" @close="logTimeOpen = false" />
+    <LogTimeModal :open="logTimeOpen" :preset="logTimePreset" @close="logTimeOpen = false" />
 
     <button
       class="logtime-fab"
       type="button"
       title="Log time to ClickUp (L)"
-      @click="logTimeOpen = true"
+      @click="openLogTime()"
     >
       <span aria-hidden="true">⏱</span> Log time
     </button>
@@ -126,7 +143,7 @@ onUnmounted(() => {
     </template>
 
     <!-- Day -->
-    <DayTimeline v-else-if="state.view === 'day'" :model="dayModel" />
+    <DayTimeline v-else-if="state.view === 'day'" :model="dayModel" @log-slot="onLogSlot" />
 
     <!-- Tasks -->
     <template v-else-if="state.view === 'tasks'">
@@ -146,16 +163,6 @@ onUnmounted(() => {
         <span class="secct">{{ prsModel.count }}</span>
       </div>
       <PRsView :prs="prsModel.prs" :loading="isLoading" />
-    </template>
-
-    <!-- Time entry templates -->
-    <template v-else-if="state.view === 'templates'">
-      <div class="seclbl">
-        <span class="sec-ico" aria-hidden="true">⏱</span>
-        Time entry templates — one click to log to ClickUp
-        <span class="secct">{{ templatesModel.count }}</span>
-      </div>
-      <TemplatesView :groups="templatesModel.groups" />
     </template>
 
     <div class="status">{{ state.status }}</div>

@@ -4,6 +4,9 @@ import { isLoading, dayLoaded } from "../store.js";
 defineProps({
   model: { type: Object, required: true },
 });
+// A free slot is an invitation to log against it — the parent opens the Log time
+// drawer prefilled with the slot's range.
+const emit = defineEmits(["log-slot"]);
 </script>
 
 <template>
@@ -34,17 +37,20 @@ defineProps({
           <span class="lbl">{{ row.label }}</span>
         </div>
 
-        <div
+        <button
           v-for="slot in model.timeline.placeholders"
           :key="slot.id"
+          type="button"
           class="tl-free"
           :class="{ short: slot.short }"
           :style="{ top: slot.top + 'px', height: slot.height + 'px', left: slot.left, width: slot.width }"
           :title="slot.tooltip"
+          @click="emit('log-slot', { start: slot.start, end: slot.end })"
         >
           <span class="tf-range">{{ slot.rangeText }}</span>
           <span class="tf-meta">{{ slot.durationText }} free</span>
-        </div>
+          <span class="tf-cta" aria-hidden="true">Log time</span>
+        </button>
 
         <component
           :is="block.tag"

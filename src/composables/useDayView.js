@@ -1,5 +1,5 @@
 import { computed } from "vue";
-import { state, workingHours } from "../store.js";
+import { state, workingHours, nowTick } from "../store.js";
 import { PX_PER_HOUR } from "../constants.js";
 import { iso, pad, sameDay, startOfDay, timeOfDay, formatHoursMinutes, formatTodayHeader } from "../utils/date.js";
 import { cuReady, isOnCallTask } from "./useClickUp.js";
@@ -11,6 +11,10 @@ const BASE = 70, RPAD = 8, GAP = 6;
 // Free windows shorter than this (in hours) are dropped — they are rounding
 // noise rather than a slot anything could be logged into.
 const MIN_FREE_HOURS = 1 / 60;
+
+// How far past the last entry the after-hours slot reaches on a day that isn't
+// today. Today's is bounded by the current time instead.
+const AFTER_HOURS_STUB = 1;
 
 // Subtract the busy intervals from [from, to] and return what's left. Inputs are
 // hours-from-midnight; overlapping busy intervals are merged as we sweep.
@@ -132,12 +136,38 @@ export function useDayView(){
     if (!hasClickUp){
       return { title, badge, stats, empty: "Connect ClickUp in settings (⚙) to see this day's time entries.", timeline: null };
     }
-    // Unlogged slots inside the configured working hours. Only days that are
-    // meant to be worked get them — a weekend or holiday has no window to fill.
     const work = workingHours.value;
-    const freeSlots = isWorkday
-      ? freeWindows(entries.map(e => [startFracOf(e), endFracOf(e)]), work.start, work.end)
-      : [];
+    // Reading the tick is what makes this model recompute as the clock moves, so
+    // today's trailing slot and the now line follow it on an open page.
+    const now = new Date(nowTick.value);
+    const nowFrac = now.getHours() + now.getMinutes() / 60;
+
+    // Free windows are measured against regular entries only. An On Call shift
+    // runs alongside real work rather than replacing it, so it must not swallow a
+    // slot — which means a placeholder can overlap an On Call block, and they all
+    // join the column layout below rather than sitting full-width behind them.
+    const busy = regularEntries.map(e => [startFracOf(e), endFracOf(e)]);
+
+    let freeSlots;
+    if (isToday){
+      // Nothing in the future is loggable, so today's sweep ends at the current
+      // moment rather than at the end of the working window. That gives the
+      // trailing slot for free: it always runs from the last entry — or the start
+      // of the window, when there is none — up to now, however far past working
+      // hours that reaches.
+      freeSlots = freeWindows(busy, work.start, Math.max(work.start, nowFrac));
+    } else {
+      // Any other day has no "now" to run to: fill the working window, and stub
+      // out a fixed stretch past it when work carried on beyond the window.
+      freeSlots = isWorkday ? freeWindows(busy, work.start, work.end) : [];
+      if (regularEntries.length){
+        const lastEnd = Math.max(...regularEntries.map(endFracOf));
+        if (lastEnd > work.end && lastEnd < 24){
+          const end = Math.min(24, lastEnd + AFTER_HOURS_STUB);
+          if (end - lastEnd >= MIN_FREE_HOURS) freeSlots.push([lastEnd, end]);
+        }
+      }
+    }
 
     if (entries.length === 0 && freeSlots.length === 0){
       return { title, badge, stats, empty: "No time entries logged for this day yet.", timeline: null };
@@ -150,7 +180,11 @@ export function useDayView(){
       if (sH < minH) minH = sH;
       if (eH > maxH) maxH = eH;
     }
-    const now = new Date();
+    // A slot can reach past every entry, so the timeline has to grow to hold it.
+    for (const [, slotEnd] of freeSlots){
+      const eH = Math.ceil(slotEnd);
+      if (eH > maxH) maxH = eH;
+    }
     if (isToday){
       const nowH = now.getHours();
       if (nowH < minH) minH = nowH;
@@ -167,33 +201,51 @@ export function useDayView(){
     }
     const height = (maxH - minH) * PX_PER_HOUR;
 
-    // Placeholders never overlap a real entry (they are the complement of them),
-    // so they always span the full width behind the blocks.
-    const placeholders = freeSlots.map(([s, e]) => {
+    // Slots are laid out alongside the entries: they only avoid regular work, so
+    // an On Call shift covering the same stretch has to sit beside a slot rather
+    // than on top of it — a placeholder buried under a block is unclickable.
+    const laid = layoutColumns([
+      ...entries.map(e => ({ ...e })),
+      ...freeSlots.map(([s, e], i) => ({
+        start: new Date(dayStartMs + s * 3600000),
+        end: new Date(dayStartMs + e * 3600000),
+        _slot: i,
+      })),
+    ]);
+
+    // Column geometry shared by blocks and slots.
+    const laneSpan = cols => `(100% - ${BASE + RPAD}px - ${(cols - 1) * GAP}px)/${cols}`;
+    const laneLeft = (col, cols) =>
+      (col === 0 ? `${BASE}px` : `calc(${BASE}px + ${col} * (${laneSpan(cols)} + ${GAP}px))`);
+
+    const placeholders = laid.filter(e => e._slot !== undefined).map(seed => {
+      const [s, e] = freeSlots[seed._slot];
       const blockHeight = Math.max(22, (e - s) * PX_PER_HOUR - 6);
       return {
         id: `free-${s}-${e}`,
         top: (s - minH) * PX_PER_HOUR,
         height: blockHeight,
-        left: `${BASE}px`,
-        width: `calc(100% - ${BASE + RPAD}px)`,
+        left: laneLeft(seed._col, seed._cols),
+        width: `calc(${laneSpan(seed._cols)})`,
         short: blockHeight < 40,
+        // Clock times the Log time drawer is prefilled with when the slot is
+        // clicked.
+        start: hhmm(s),
+        end: hhmm(e),
         rangeText: `${hhmm(s)}–${hhmm(e)}`,
         durationText: formatHoursMinutes(e - s),
-        tooltip: `Nothing logged ${hhmm(s)}–${hhmm(e)} (${formatHoursMinutes(e - s)})`,
+        tooltip: `Log time for ${hhmm(s)}–${hhmm(e)} (${formatHoursMinutes(e - s)})`,
       };
     });
 
-    const laid = layoutColumns(entries.map(e => ({ ...e })));
-    const blocks = laid.map(e => {
+    // `_slot` is an index, so 0 is a valid one — compare against undefined.
+    const blocks = laid.filter(e => e._slot === undefined).map(e => {
       const startFrac = startFracOf(e);
       const top = (startFrac - minH) * PX_PER_HOUR;
       const rawHeight = (endFracOf(e) - startFrac) * PX_PER_HOUR - 6;
       const blockHeight = Math.max(22, rawHeight);
-      const cols = e._cols, col = e._col;
-      const span = `(100% - ${BASE + RPAD}px - ${(cols - 1) * GAP}px)/${cols}`;
-      const width = `calc(${span})`;
-      const left = col === 0 ? `${BASE}px` : `calc(${BASE}px + ${col} * (${span} + ${GAP}px))`;
+      const width = `calc(${laneSpan(e._cols)})`;
+      const left = laneLeft(e._col, e._cols);
       const taskUrl = e.taskId ? `https://app.clickup.com/t/${e.taskId}` : null;
 
       let tip = `${e.taskName}\n${timeOfDay(e.start)}–${timeOfDay(e.end)} (${formatHoursMinutes(e.hours)})`;
@@ -219,7 +271,6 @@ export function useDayView(){
       };
     });
 
-    const nowFrac = now.getHours() + now.getMinutes() / 60;
     const nowLine = (isToday && nowFrac >= minH && nowFrac <= maxH)
       ? { top: (nowFrac - minH) * PX_PER_HOUR, label: timeOfDay(now) }
       : null;

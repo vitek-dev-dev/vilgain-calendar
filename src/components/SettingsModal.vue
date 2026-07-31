@@ -2,7 +2,8 @@
 import { ref, computed, watch, nextTick } from "vue";
 import { state, saveConfig, setStatus, setCuPill, syncPill, workingHours } from "../store.js";
 import { pad } from "../utils/date.js";
-import { cuReady, cuLoadAccount, cuLoadTeams, isValidOnCallPattern } from "../composables/useClickUp.js";
+import { cuReady, cuLoadAccount, cuLoadTeams, cuLoadFolders, isValidOnCallPattern } from "../composables/useClickUp.js";
+import { isValidPriorityPattern, clearTaskPools } from "../composables/useTaskFinder.js";
 import { ghReady, ghLoadAccount, ghLoadPRs } from "../composables/useGitHub.js";
 import { refresh } from "../composables/useCalendar.js";
 
@@ -23,6 +24,7 @@ const ghTokenInput = ref("");
 const ghOrgInput = ref("");
 const onCallRows = ref([]);
 const excludeRows = ref([]);
+const priorityRows = ref([]);
 const tokenEl = ref(null);
 const cuTeamsLoading = ref(false);
 const ghAccountLoading = ref(false);
@@ -95,6 +97,7 @@ watch(() => props.open, (isOpen) => {
   ghOrgInput.value = state.config.githubOrg || "";
   onCallRows.value = [...(state.config.onCallTasks || [])];
   excludeRows.value = [...(state.config.excludeStatuses || [])];
+  priorityRows.value = [...(state.config.priorityTasks || [])];
   // Guarded so reopening the dialog doesn't refetch what we already have, or fire
   // a second request while the first is still in flight. The workspace list is
   // gated on the token alone, not cuReady(), so it also loads in the state where
@@ -151,6 +154,42 @@ function persistExclude(){
 function addExclude(){ excludeRows.value.push(""); }
 function removeExclude(i){ excludeRows.value.splice(i, 1); persistExclude(); }
 
+// Sprint folder — loaded only when the Tasks tab is opened, since enumerating
+// folders costs a request per Space.
+const folders = ref([]);
+const foldersLoading = ref(false);
+
+async function loadFolders(){
+  if (folders.value.length || foldersLoading.value || !cuReady()) return;
+  foldersLoading.value = true;
+  try {
+    folders.value = await cuLoadFolders();
+  } catch (err){
+    setStatus("ClickUp: " + err.message);
+  } finally {
+    foldersLoading.value = false;
+  }
+}
+
+watch(activeTab, (tab) => { if (tab === "tasks") loadFolders(); });
+
+// Changing it changes what counts as a sprint, so drop the cached pools and the
+// list metadata derived from the old setting.
+function applySprintFolder(){
+  saveConfig();
+  clearTaskPools();
+}
+
+// Priority tasks (row editor) — the task picker reads config reactively, so
+// persisting is enough.
+function persistPriority(){
+  state.config.priorityTasks = priorityRows.value.map(s => s.trim()).filter(Boolean);
+  saveConfig();
+}
+function priorityRowInvalid(i){ return !isValidPriorityPattern(priorityRows.value[i]); }
+function addPriority(){ priorityRows.value.push(""); }
+function removePriority(i){ priorityRows.value.splice(i, 1); persistPriority(); }
+
 function applyClickUpSelect(){
   saveConfig();
   refresh();
@@ -179,6 +218,8 @@ function disconnect(){
   Object.assign(state.config, { token: "", teamId: "", hoursPerDay: state.hoursPerDay });
   state.cuUser = null;
   state.cuTeams = [];
+  // A different token may see a different workspace, so don't reuse the pool.
+  clearTaskPools();
   state.entries.clear();
   state.onCall.clear();
   state.dayEntries = [];
@@ -373,6 +414,60 @@ function disconnectGh(){
           </div>
           <div v-else class="list-empty-note">No on-call task patterns yet.</div>
           <button class="row-add" type="button" @click="addOnCall">＋ Add pattern</button>
+        </div>
+
+        <!-- Sprint folder -->
+        <div class="set-card">
+          <div>
+            <div class="set-label">Sprint folder</div>
+            <div class="set-help">
+              The Folder holding your Sprint Lists. ClickUp's API doesn't mark sprints, so this
+              is what makes them detectable — until it's set, tasks show their Folder instead of
+              a sprint.
+            </div>
+          </div>
+          <div class="sel-wrap">
+            <select
+              v-model="state.config.sprintFolderId"
+              :class="{ invalid: connected && !state.config.sprintFolderId }"
+              :disabled="!connected"
+              @change="applySprintFolder"
+            >
+              <option value="" disabled>{{ foldersLoading ? "Loading folders…" : "Select a folder…" }}</option>
+              <option v-for="f in folders" :key="f.id" :value="f.id">{{ f.space }} / {{ f.name }}</option>
+            </select>
+            <span class="sel-caret" aria-hidden="true">▾</span>
+          </div>
+        </div>
+
+        <!-- Priority tasks -->
+        <div class="set-card">
+          <div>
+            <div class="set-label">Priority tasks</div>
+            <div class="set-help">
+              Tasks whose name matches any of these are pinned to the top of the task picker
+              under the Default sort, including ones in the current sprint that aren't assigned
+              to you. Each row is a case-insensitive regular expression matched anywhere in the
+              name — e.g. <code>^BAU \|</code> for a prefix.
+            </div>
+          </div>
+          <div v-if="priorityRows.length" class="list-rows">
+            <div v-for="(_, i) in priorityRows" :key="i" class="list-row">
+              <input
+                v-model="priorityRows[i]"
+                :class="{ invalid: priorityRowInvalid(i) }"
+                :title="priorityRowInvalid(i) ? 'Not a valid regular expression — this row never matches.' : ''"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Task name pattern"
+                @change="persistPriority"
+              >
+              <button class="row-remove" type="button" aria-label="Remove" @click="removePriority(i)">−</button>
+            </div>
+          </div>
+          <div v-else class="list-empty-note">No priority task patterns yet.</div>
+          <button class="row-add" type="button" @click="addPriority">＋ Add pattern</button>
         </div>
 
         <!-- Exclude statuses -->

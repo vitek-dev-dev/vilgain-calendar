@@ -69,8 +69,8 @@ body{
 .tab:hover{color:rgba(255,255,255,.8)}
 .tab.active{color:#fff;background:rgba(255,255,255,.08);border-bottom-color:var(--accent-2)}
 /* min-height reserves the .datenav row (34px + the 8px padding) so the tab bar
-   keeps one height on every view — Tasks/PRs show only a title link, and on
-   Templates .view-title is empty, which would otherwise collapse the row. */
+   keeps one height on every view — Tasks/PRs show only a title link, which
+   would otherwise collapse the row. */
 .tabbar-right{display:flex;align-items:center;gap:12px;padding-bottom:8px;min-height:42px}
 .view-title{font-size:14px;font-weight:600;color:rgba(255,255,255,.85)}
 a.view-title-link{display:inline-flex;align-items:center;gap:4px;text-decoration:none;transition:color .12s ease}
@@ -231,14 +231,27 @@ a.view-title-link .ext-ico{font-size:12px;opacity:.7}
 }
 .tl-block.short{padding:6px 14px}
 /* Unlogged slot inside working hours — sits behind the real blocks. */
+/* A button: clicking a free slot opens Log time prefilled with its range. */
 .tl-free{
   position:absolute;overflow:hidden;z-index:1;
-  display:flex;align-items:center;gap:10px;
+  display:flex;align-items:center;gap:10px;text-align:left;cursor:pointer;
   border-radius:12px;padding:10px 15px;
   background:repeating-linear-gradient(135deg,rgba(15,23,42,.028) 0 10px,transparent 10px 20px);
   border:1.5px dashed rgba(15,23,42,.16);
+  transition:border-color .12s ease,background-color .12s ease;
 }
+.tl-free:hover{border-color:var(--accent);background-color:rgba(109,93,240,.05)}
+.tl-free:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tl-free.short{padding:4px 14px}
+/* Reveals the affordance on hover without adding noise to every empty slot. */
+.tl-free .tf-cta{
+  margin-left:auto;flex:none;opacity:0;transition:opacity .12s ease;
+  padding:3px 10px;border-radius:999px;
+  background:var(--accent);color:#fff;
+  font:700 11px system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.tl-free:hover .tf-cta,.tl-free:focus-visible .tf-cta{opacity:1}
+.tl-free.short .tf-cta{padding:1px 8px;font-size:10px}
 .tl-free .tf-range{
   font:700 13px system-ui,-apple-system,"Segoe UI",sans-serif;
   color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;
@@ -320,59 +333,6 @@ a.task-card{text-decoration:none;color:inherit}
 .task-tracked.over{color:var(--red)}
 .task-est{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
 
-/* ---------- Time entry templates ---------- */
-.tpl-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.tpl-datelbl{display:flex;align-items:center;gap:8px;font:600 12px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted)}
-.tpl-date{
-  font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;
-  padding:6px 10px;border:1px solid var(--hair);border-radius:8px;
-  background:var(--card);color:var(--ink);
-}
-.tpl-cards{display:flex;flex-direction:column;gap:8px}
-.tpl-card.saving{opacity:.75}
-.tpl-card.done{border-color:var(--green)}
-.tpl-card.error{border-color:var(--red)}
-.tpl-ico{font-size:20px;line-height:1;flex:none}
-.tpl-times{display:flex;align-items:center;gap:7px;flex:none}
-.tpl-time{
-  font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;
-  padding:5px 8px;border:1px solid var(--hair);border-radius:8px;
-  background:var(--card);color:var(--ink);font-variant-numeric:tabular-nums;
-}
-.tpl-time:disabled{opacity:.6}
-.tpl-dash{color:var(--faint);font-size:13px}
-.tpl-card .task-time{width:52px;flex:none;text-align:right}
-.tpl-log-btn{
-  flex:none;font:700 12px system-ui,-apple-system,"Segoe UI",sans-serif;
-  padding:8px 16px;border-radius:8px;border:1px solid var(--accent);
-  background:var(--accent);color:#fff;cursor:pointer;transition:filter .12s ease;
-}
-.tpl-log-btn:hover:not(:disabled){filter:brightness(1.06)}
-.tpl-log-btn:disabled{opacity:.55;cursor:default}
-.tpl-card.done .tpl-log-btn{background:var(--green);border-color:var(--green)}
-.tpl-card.error .tpl-log-btn{background:var(--red);border-color:var(--red)}
-.tpl-note{margin-top:14px}
-
-/* Linked ClickUp task on a template card */
-.tpl-task{display:flex;align-items:center;gap:4px;margin-top:5px;min-width:0}
-.tpl-task-btn{
-  display:flex;align-items:center;gap:5px;min-width:0;max-width:100%;
-  padding:2px 8px 2px 6px;border-radius:999px;cursor:pointer;
-  border:1px solid rgba(109,93,240,.25);background:rgba(109,93,240,.08);
-  font:600 11px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--accent);
-}
-.tpl-task-btn:hover{background:rgba(109,93,240,.14)}
-.tpl-task-btn.empty{border-style:dashed;border-color:var(--disabled);background:none;color:var(--faint)}
-.tpl-task-btn.empty:hover{border-color:var(--accent);color:var(--accent)}
-.tpl-task-ico{font-size:10px;line-height:1;flex:none}
-.tpl-task-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tpl-task-clear{
-  flex:none;width:18px;height:18px;border:none;border-radius:50%;cursor:pointer;
-  background:none;color:var(--faint);font-size:10px;line-height:1;
-  display:flex;align-items:center;justify-content:center;
-}
-.tpl-task-clear:hover{background:#fef2f2;color:var(--red)}
-
 /* ---------- Task finder modal ---------- */
 .finder-backdrop{
   position:fixed;inset:0;z-index:80;
@@ -410,11 +370,21 @@ a.task-card{text-decoration:none;color:inherit}
 }
 .finder-search input:focus{border-color:var(--accent)}
 
-.finder-filters{flex:none;display:flex;align-items:center;gap:10px;padding:12px 20px}
-.finder-scope-note{
-  padding:4px 10px;border-radius:999px;background:#f1f3f7;
-  font:600 11.5px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);
+/* Wraps because the sort control grew to four options — on a narrow drawer the
+   closed/refresh controls drop to a second line rather than overflowing. */
+.finder-filters{flex:none;display:flex;align-items:center;gap:10px;padding:12px 20px;flex-wrap:wrap}
+/* Sort mode — segmented control */
+.finder-sort{
+  display:flex;gap:2px;flex:none;
+  background:#f1f3f7;border:1px solid rgba(15,23,42,.08);border-radius:9px;padding:3px;
 }
+.finder-sort button{
+  border:none;border-radius:7px;cursor:pointer;background:none;padding:5px 10px;
+  font:600 11.5px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);
+  white-space:nowrap;
+}
+.finder-sort button.active{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.finder-sort button:hover:not(.active){color:var(--ink)}
 .finder-check{
   display:flex;align-items:center;gap:6px;cursor:pointer;
   font:600 11.5px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);
@@ -439,8 +409,6 @@ a.task-card{text-decoration:none;color:inherit}
 }
 .finder-row.active{background:rgba(109,93,240,.09)}
 .finder-row.current{border-left-color:var(--accent)}
-.finder-row.none{border-bottom:1px solid rgba(15,23,42,.07);border-radius:9px 9px 0 0;margin-bottom:2px}
-.finder-none-ico{flex:none;width:9px;text-align:center;color:var(--faint);font-size:12px}
 .finder-dot{width:9px;height:9px;border-radius:3px;flex:none}
 .finder-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .finder-title{
@@ -474,6 +442,18 @@ a.task-card{text-decoration:none;color:inherit}
   padding:2px 7px;border-radius:999px;background:#eef1f6;color:var(--muted);
 }
 .finder-tag.current{background:rgba(109,93,240,.12);color:var(--accent)}
+.finder-pin{font-size:10px;margin-right:2px}
+/* The figure the active sort is ordering by, so the order is legible. */
+.finder-stat{
+  flex:none;font:700 11px system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-variant-numeric:tabular-nums;color:var(--muted);
+}
+/* Current sprint in the Log time header — sits beside the title, not centred by
+   the header's space-between. */
+.lt-head-sprint{
+  margin-right:auto;max-width:220px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
 .finder-msg{padding:14px 10px;font-size:12.5px;color:var(--faint)}
 .finder-msg-err{color:var(--red)}
 
@@ -620,7 +600,7 @@ a.pr-card{text-decoration:none;color:inherit}
 .settings{
   position:fixed;z-index:70;
   top:50%;left:50%;transform:translate(-50%,calc(-50% + 8px));
-  width:480px;max-width:calc(100% - 32px);max-height:88vh;
+  width:860px;max-width:calc(100% - 32px);max-height:88vh;
   background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(8,12,28,.5);
   display:flex;flex-direction:column;overflow:hidden;color:var(--ink);
   visibility:hidden;opacity:0;
@@ -651,7 +631,17 @@ a.pr-card{text-decoration:none;color:inherit}
 .settings-tab.active{color:var(--ink);border-bottom-color:var(--accent)}
 .settings-tab:hover:not(.active){color:var(--muted)}
 
-.settings-body{flex:1;min-height:0;padding:22px 24px 26px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+/* Two cards per row — the tabs had grown long enough to scroll. Cards in a row
+   stretch to a common height (the grid default) so the tab reads as an even
+   deck rather than ragged boxes. */
+.settings-body{
+  flex:1;min-height:0;padding:22px 24px 26px;overflow-y:auto;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;align-content:start;
+}
+/* Wide controls read badly at half width. */
+.settings-body .pref-row{grid-column:1 / -1}
+.settings select.invalid{border-color:var(--amber);background:#fffbeb}
 
 /* Section card (integrations + settings groups) */
 .set-card{
@@ -802,6 +792,9 @@ a.pr-card{text-decoration:none;color:inherit}
 /* Full-bleed drawer once it covers the whole width. */
 @media (max-width:660px){
   .lt-drawer{border-radius:0}
+}
+@media (max-width:900px){
+  .settings-body{grid-template-columns:minmax(0,1fr)}
 }
 @media (max-width:640px){
   .app{padding:8px 14px 32px}

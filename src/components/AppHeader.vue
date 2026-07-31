@@ -10,7 +10,6 @@ const TABS = [
   { key: "day", label: "Day", icon: "🕒" },
   { key: "tasks", label: "Tasks", icon: "✅" },
   { key: "prs", label: "Pull requests", icon: "🔀" },
-  { key: "templates", label: "Templates", icon: "⏱" },
 ];
 
 const title = computed(() => {

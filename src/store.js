@@ -1,9 +1,9 @@
-import { reactive, computed } from "vue";
+import { reactive, computed, ref } from "vue";
 import { LS_KEY, VIEW_LS_KEY } from "./constants.js";
 import { startOfMonth, startOfDay, iso, monthKey } from "./utils/date.js";
 
 export function loadConfig(){
-  const defaults = { token: "", teamId: "", hoursPerDay: 8, workStartHour: 8, workEndHour: 16, onCallTasks: [], excludeStatuses: [], templateTasks: {}, githubToken: "", githubOrg: "" };
+  const defaults = { token: "", teamId: "", hoursPerDay: 8, workStartHour: 8, workEndHour: 16, onCallTasks: [], excludeStatuses: [], priorityTasks: [], sprintFolderId: "", taskSort: "default", githubToken: "", githubOrg: "" };
   try {
     const parsed = JSON.parse(localStorage.getItem(LS_KEY)) || {};
     // Legacy: the assignee used to be selectable. Everything is scoped to the
@@ -21,11 +21,10 @@ export function viewFromHash(){
   if (h === "month" || h === "calendar") return "month";
   if (h === "tasks") return "tasks";
   if (h === "prs" || h === "pulls" || h === "pull-requests") return "prs";
-  if (h === "templates" || h === "log") return "templates";
   return null;
 }
 
-const VIEWS = ["month", "day", "tasks", "prs", "templates"];
+const VIEWS = ["month", "day", "tasks", "prs"];
 const savedView = localStorage.getItem(VIEW_LS_KEY);
 const initialConfig = loadConfig();
 
@@ -55,6 +54,12 @@ export const state = reactive({
 });
 
 export const isLoading = computed(() => state.loading > 0);
+
+// Wall clock, republished on an interval (see App.vue) so views that draw "now"
+// keep up on a page left open — the day timeline's current-time line and the
+// trailing free slot that runs up to it.
+export const nowTick = ref(Date.now());
+export const NOW_TICK_MS = 30000;
 
 // Whether the month / day on screen has already been fetched. These drive the
 // same silent-refresh behaviour the Tasks and PRs views have: a period we have

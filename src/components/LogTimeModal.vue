@@ -5,6 +5,7 @@ import { cuReady, cuLogTimeRange } from "../composables/useClickUp.js";
 import { refresh } from "../composables/useCalendar.js";
 import { iso, pad, formatHoursMinutes } from "../utils/date.js";
 import TaskFinderPanel from "./TaskFinderPanel.vue";
+import { currentSprint } from "../composables/useTaskFinder.js";
 
 // "Log an entry to ClickUp" as an off-canvas drawer rather than a dialog stack:
 // the form sits at the top at its natural height and the task search fills the
@@ -120,13 +121,17 @@ async function save(){
   >
     <header class="finder-head">
       <h2 id="logtime-title">Log time</h2>
+      <span
+        v-if="currentSprint"
+        class="finder-sprint lt-head-sprint"
+        :title="`Current sprint: ${currentSprint}`"
+      ><span aria-hidden="true">🏃</span>{{ currentSprint }}</span>
       <button class="settings-close" type="button" aria-label="Close" @click="emit('close')">✕</button>
     </header>
 
     <TaskFinderPanel
       :active="open"
       :selected-id="task ? task.id : ''"
-      :allow-none="false"
       @select="task = $event"
     />
 
