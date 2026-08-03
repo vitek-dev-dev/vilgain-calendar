@@ -13,10 +13,17 @@ const MAX_PAGES = 10;
 // cacheKey -> { tasks, truncated }
 const pools = new Map();
 
+// The sprint running today, across every sprint list we have resolved. Shown in
+// the Log time header; empty until a pool load has populated listMeta.
+export const currentSprint = ref("");
+
 export function clearTaskPools(){
   pools.clear();
   listMeta.clear();
   folderLoaded.clear();
+  // Derived from listMeta, so it would otherwise keep naming a sprint resolved
+  // under the previous workspace / sprint folder.
+  currentSprint.value = "";
 }
 
 // ClickUp exposes no sprint flag anywhere in the v2 API, so the sprint is read
@@ -84,10 +91,6 @@ function stampSprint(task, now){
   task.sprintIsFolder = false;
   task.sprintIsCurrent = !!current;
 }
-
-// The sprint running today, across every sprint list we have resolved. Shown in
-// the Log time header; empty until a pool load has populated listMeta.
-export const currentSprint = ref("");
 
 function currentSprintMeta(now){
   let best = null;

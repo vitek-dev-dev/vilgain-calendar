@@ -1,6 +1,5 @@
 import { computed } from "vue";
-import { state, mandayHours } from "../store.js";
-import { MONTHS } from "../constants.js";
+import { state, hoursPerDay, mandayHours } from "../store.js";
 import { mondayIndex, isoWeekNumber, iso, sameDay, daysInMonth, formatHours } from "../utils/date.js";
 import { cuReady } from "./useClickUp.js";
 
@@ -33,7 +32,6 @@ export function useMonthView(){
     const cursor = state.cursor;
     const year = cursor.getFullYear();
     const month = cursor.getMonth();
-    const title = `${MONTHS[month]} ${year}`;
 
     const first = new Date(year, month, 1);
     const leading = mondayIndex(first);
@@ -41,7 +39,7 @@ export function useMonthView(){
     const cellCount = Math.ceil((leading + total) / 7) * 7;
     const today = new Date();
     const hasClickUp = cuReady();
-    const target = state.hoursPerDay;
+    const target = hoursPerDay.value;
 
     let workDays = 0, weekendDays = 0, holidayOnWeekday = 0, loggedTotal = 0, onCallTotal = 0;
     const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
@@ -142,7 +140,6 @@ export function useMonthView(){
     }
 
     return {
-      title,
       hasClickUp,
       weeks,
       stats: {

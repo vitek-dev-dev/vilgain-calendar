@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onUnmounted } from "vue";
 import { state, setStatus } from "../store.js";
-import { cuReady, cuLogTimeRange } from "../composables/useClickUp.js";
+import { cuReady, cuLogTimeRange, clearTaskStats } from "../composables/useClickUp.js";
 import { refresh } from "../composables/useCalendar.js";
 import { iso, pad, formatHoursMinutes } from "../utils/date.js";
 import TaskFinderPanel from "./TaskFinderPanel.vue";
@@ -18,7 +18,7 @@ const props = defineProps({
   // { dateIso, start, end, task }
   preset: { type: Object, default: () => ({}) },
 });
-const emit = defineEmits(["close", "logged"]);
+const emit = defineEmits(["close"]);
 
 const date = ref(iso(new Date()));
 const start = ref("09:00");
@@ -41,8 +41,21 @@ function plusHour(hhmm){
   return `${pad((h + 1) % 24)}:${pad(m)}`;
 }
 
+// Escape closes from anywhere in the overlay, including the search field, which
+// a keydown handler on the container would miss once focus moves around.
+function onKeydown(e){
+  if (e.key === "Escape" && props.open){
+    e.preventDefault();
+    emit("close");
+  }
+}
+
 watch(() => props.open, (isOpen) => {
-  if (!isOpen) return;
+  if (!isOpen){
+    window.removeEventListener("keydown", onKeydown);
+    return;
+  }
+  window.addEventListener("keydown", onKeydown);
   const p = props.preset || {};
   // Default to the day being viewed rather than today — logging almost always
   // targets the day already on screen.
@@ -54,18 +67,6 @@ watch(() => props.open, (isOpen) => {
   saving.value = false;
 });
 
-// Escape closes from anywhere in the overlay, including the search field, which
-// a keydown handler on the container would miss once focus moves around.
-function onKeydown(e){
-  if (e.key === "Escape" && props.open){
-    e.preventDefault();
-    emit("close");
-  }
-}
-watch(() => props.open, (isOpen) => {
-  if (isOpen) window.addEventListener("keydown", onKeydown);
-  else window.removeEventListener("keydown", onKeydown);
-});
 onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 
 function toMinutes(hhmm){
@@ -99,7 +100,9 @@ async function save(){
       taskId: task.value.id,
     });
     setStatus(`Logged ${durationLabel.value} on ${date.value} to “${task.value.title}”.`);
-    emit("logged");
+    // The picker's "most / last worked on" sorts are built from cached monthly
+    // totals that this entry has just invalidated.
+    clearTaskStats();
     emit("close");
     refresh();
   } catch (err){

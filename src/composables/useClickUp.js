@@ -37,7 +37,7 @@ export function isOnCallTask(name){
 
 export async function cuFetch(path, params){
   const token = state.config.token;
-  if (!token) throw new Error("Chybí token");
+  if (!token) throw new Error("Missing ClickUp token");
   const qs = params ? ("?" + new URLSearchParams(params)) : "";
   const res = await fetch(`https://api.clickup.com/api/v2${path}${qs}`, {
     headers: { "Authorization": token, "Accept": "application/json" },
@@ -55,7 +55,7 @@ export async function cuFetch(path, params){
 // entry. The entry belongs to the token owner.
 export async function cuCreateTimeEntry({ start, stop, duration, description, taskId, billable }){
   const token = state.config.token;
-  if (!token) throw new Error("Chybí token");
+  if (!token) throw new Error("Missing ClickUp token");
   if (!state.config.teamId) throw new Error("No workspace selected");
   // Send both `stop` and `duration`. With `duration` alone ClickUp leaves the
   // entry's end unset ("Invalid date"), so we pass the explicit end timestamp.
@@ -232,8 +232,13 @@ export async function cuLoadTimeEntries(year, month){
     const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
     const list = json.data || [];
     // The picker's "most / last worked on" sorts read this, so capture it while
-    // the month's entries are in hand rather than fetching them again.
+    // the month's entries are in hand rather than fetching them again. Keyed by
+    // period, so it is worth keeping even if the cursor has moved on.
     taskStatsByPeriod.set(period, bucketTaskStats(list));
+    // Navigated to another month while this was in flight: the data describes a
+    // period nobody is looking at, and committing it would leave the grid showing
+    // one month under another month's header.
+    if (monthKey(state.cursor) !== period) return;
     // Bucket into fresh maps first, then swap in one synchronous go — the grid
     // never renders a half-filled month.
     const entries = new Map(), onCall = new Map();
@@ -281,13 +286,21 @@ export async function cuLoadDayEntries(){
   try {
     const json = await cuFetch(`/team/${state.config.teamId}/time_entries`, params);
     const list = json.data || [];
+    // Same reasoning as the month grid: a response for a day we have navigated
+    // away from must not land on the timeline.
+    if (iso(state.dayCursor) !== dayKey) return;
     const dayStartMs = dayStart.getTime();
     const nextMidnightMs = dayStartMs + 24 * 3600000;
     const entries = [];
     for (const e of list){
       const startMs = Number(e.start);
+      if (!Number.isFinite(startMs)) continue;
       const durMs = Math.max(0, Number(e.duration) || 0);
-      const endMs = e.end ? Number(e.end) : startMs + durMs;
+      // A running or malformed entry can report an end that is missing, zero or
+      // before the start — fall back to the duration so the block always has a
+      // forward-running span rather than a negative one.
+      const rawEnd = Number(e.end);
+      const endMs = Number.isFinite(rawEnd) && rawEnd > startMs ? rawEnd : startMs + durMs;
       // The window above also returns the neighbouring days' entries. Keep only
       // those that start on the viewed day or overlap into it (an overnight shift
       // that began the day before and is still running through this midnight).
@@ -303,7 +316,7 @@ export async function cuLoadDayEntries(){
         hours: durMs / 3600000,
         taskId: task.id || null,
         taskCustomId: task.custom_id || null,
-        taskName: task.name || e.description || "(bez úkolu)",
+        taskName: task.name || e.description || "(no task)",
         description: e.description || "",
         taskStatus: (task.status && task.status.status) || "",
         billable: !!e.billable,

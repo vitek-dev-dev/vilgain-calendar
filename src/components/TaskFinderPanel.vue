@@ -42,7 +42,9 @@ const connected = computed(() => cuReady());
 const sortMode = ref(SORT_MODES.some(m => m.key === state.config.taskSort) ? state.config.taskSort : "default");
 
 // Per-task hours / last-worked for the current calendar month. Free when the
-// calendar already loaded that month; one request otherwise.
+// calendar already loaded that month; one request otherwise. Only the two
+// time-entry sorts need them.
+const NEEDS_STATS = new Set(["worked", "recent"]);
 const monthStats = ref(new Map());
 
 async function loadStats(){
@@ -99,9 +101,6 @@ function statLabel(task){
   if (sortMode.value === "recent" && s.last) return shortDate(s.last);
   return "";
 }
-
-// Only the time-entry sorts need the month's totals.
-const NEEDS_STATS = new Set(["worked", "recent"]);
 
 // Flat row list the keyboard walks over: the pinned resolved reference first,
 // then the filtered pool.

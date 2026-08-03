@@ -4,5 +4,7 @@ export const MONTHS = ["January", "February", "March", "April", "May", "June", "
 
 export const LS_KEY = "calendar.clickup.v1";
 export const VIEW_LS_KEY = "calendar.view.v1";
+// Every view the app can show; also the whitelist for the stored / hash view.
+export const VIEWS = ["month", "day", "tasks", "prs"];
 // Timeline scale: one hour = 64px (design token).
 export const PX_PER_HOUR = 64;

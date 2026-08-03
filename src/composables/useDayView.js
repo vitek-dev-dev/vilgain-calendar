@@ -1,7 +1,7 @@
 import { computed } from "vue";
-import { state, workingHours, nowTick, mandayHours } from "../store.js";
+import { state, workingHours, nowTick, hoursPerDay, mandayHours } from "../store.js";
 import { PX_PER_HOUR } from "../constants.js";
-import { iso, pad, sameDay, startOfDay, timeOfDay, formatHours, formatHoursMinutes, formatTodayHeader } from "../utils/date.js";
+import { iso, pad, sameDay, startOfDay, timeOfDay, mondayIndex, formatHours, formatHoursMinutes } from "../utils/date.js";
 import { cuReady, isOnCallTask } from "./useClickUp.js";
 
 // Timeline block geometry (design tokens): a fixed left gutter for the hour
@@ -75,10 +75,8 @@ export function useDayView(){
     const day = state.dayCursor;
     const dayKey = iso(day);
     const isToday = sameDay(day, new Date());
-    const title = formatTodayHeader(day);
 
-    const wIdx = (day.getDay() + 6) % 7;
-    const isWeekend = wIdx >= 5;
+    const isWeekend = mondayIndex(day) >= 5;
     const holidayName = state.holidays.get(dayKey);
     const isHoliday = !!holidayName;
     const isWorkday = !isWeekend && !isHoliday;
@@ -104,8 +102,7 @@ export function useDayView(){
     const regularEntries = entries.filter(e => !isOnCallTask(e.taskName));
     const totalLogged = regularEntries.reduce((s, e) => s + inDayHours(e), 0);
     const onCallTotal = entries.reduce((s, e) => s + (isOnCallTask(e.taskName) ? inDayHours(e) : 0), 0);
-    const target = state.hoursPerDay;
-    const goal = isWorkday ? target : 0;
+    const goal = isWorkday ? hoursPerDay.value : 0;
     const remaining = Math.max(0, goal - totalLogged);
     const hasClickUp = cuReady();
 
@@ -135,7 +132,7 @@ export function useDayView(){
     };
 
     if (!hasClickUp){
-      return { title, badge, stats, empty: "Connect ClickUp in settings (⚙) to see this day's time entries.", timeline: null };
+      return { badge, stats, empty: "Connect ClickUp in settings (⚙) to see this day's time entries.", timeline: null };
     }
     const work = workingHours.value;
     // Reading the tick is what makes this model recompute as the clock moves, so
@@ -173,7 +170,7 @@ export function useDayView(){
     }
 
     if (entries.length === 0 && freeSlots.length === 0){
-      return { title, badge, stats, empty: "No time entries logged for this day yet.", timeline: null };
+      return { badge, stats, empty: "No time entries logged for this day yet.", timeline: null };
     }
 
     let minH = work.start, maxH = Math.max(work.end, work.start + 1);
@@ -279,7 +276,6 @@ export function useDayView(){
       : null;
 
     return {
-      title,
       badge,
       stats,
       empty: null,

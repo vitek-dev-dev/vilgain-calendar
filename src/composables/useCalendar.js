@@ -1,5 +1,5 @@
 import { state } from "../store.js";
-import { VIEW_LS_KEY } from "../constants.js";
+import { VIEW_LS_KEY, VIEWS } from "../constants.js";
 import { startOfMonth, startOfDay } from "../utils/date.js";
 import { cuLoadTimeEntries, cuLoadDayEntries, cuLoadTasks } from "./useClickUp.js";
 import { ghLoadPRs } from "./useGitHub.js";
@@ -34,7 +34,7 @@ export async function refresh(){
 }
 
 export function setView(view, opts){
-  if (!["month", "day", "tasks", "prs"].includes(view)) return;
+  if (!VIEWS.includes(view)) return;
   state.view = view;
   try { localStorage.setItem(VIEW_LS_KEY, view); } catch { /* ignore */ }
   const desiredHash = "#" + view;

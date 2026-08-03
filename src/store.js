@@ -1,5 +1,5 @@
 import { reactive, computed, ref } from "vue";
-import { LS_KEY, VIEW_LS_KEY } from "./constants.js";
+import { LS_KEY, VIEW_LS_KEY, VIEWS } from "./constants.js";
 import { startOfMonth, startOfDay, iso, monthKey } from "./utils/date.js";
 
 export function loadConfig(){
@@ -24,7 +24,6 @@ export function viewFromHash(){
   return null;
 }
 
-const VIEWS = ["month", "day", "tasks", "prs"];
 const savedView = localStorage.getItem(VIEW_LS_KEY);
 const initialConfig = loadConfig();
 
@@ -42,7 +41,6 @@ export const state = reactive({
   dayEntriesKey: "",     // "YYYY-MM-DD" dayEntries was loaded for
   tasks: [],             // normalized ClickUp tasks assigned to the current user
   ghPrs: [],             // normalized GitHub pull requests authored by the current user
-  hoursPerDay: initialConfig.hoursPerDay ?? 8,
   config: initialConfig,
   cuUser: null,          // authenticated ClickUp account; its id scopes task queries
   cuTeams: [],           // workspaces — only the settings dialog reads these, so
@@ -74,17 +72,24 @@ function clampHour(v, fallback){
   return Number.isFinite(n) ? Math.min(24, Math.max(0, n)) : fallback;
 }
 
-// The configured working-hours window, normalized to whole hours with
-// start < end. Both the settings UI and the day timeline read this so a
-// malformed stored value can never produce an inverted window.
+// A stored hour count, guarded against a malformed value.
+function positiveHours(v, fallback){
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+// The expected logged hours per working day. Derived from config rather than
+// mirrored into `state`, so there is one copy to keep valid.
+export const hoursPerDay = computed(() => positiveHours(state.config.hoursPerDay, 8));
+
 // Hours that make up one manday, used to express logged time in mandays. Kept
 // separate from the daily target: the target is what you aim to log, a manday is
 // the unit work is estimated in.
-export const mandayHours = computed(() => {
-  const n = Number(state.config.mandayHours);
-  return Number.isFinite(n) && n > 0 ? n : 8;
-});
+export const mandayHours = computed(() => positiveHours(state.config.mandayHours, 8));
 
+// The configured working-hours window, normalized to whole hours with
+// start < end. Both the settings UI and the day timeline read this so a
+// malformed stored value can never produce an inverted window.
 export const workingHours = computed(() => {
   const start = clampHour(state.config.workStartHour, 8);
   const end = clampHour(state.config.workEndHour, 16);

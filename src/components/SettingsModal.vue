@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, watch, nextTick } from "vue";
-import { state, saveConfig, setStatus, setCuPill, syncPill, workingHours, mandayHours } from "../store.js";
+import { state, saveConfig, setStatus, setCuPill, syncPill, workingHours, hoursPerDay, mandayHours } from "../store.js";
 import { pad } from "../utils/date.js";
-import { cuReady, cuLoadAccount, cuLoadTeams, cuLoadFolders, isValidOnCallPattern } from "../composables/useClickUp.js";
+import { cuReady, cuLoadAccount, cuLoadTeams, cuLoadFolders, clearTaskStats, isValidOnCallPattern } from "../composables/useClickUp.js";
 import { isValidPriorityPattern, clearTaskPools } from "../composables/useTaskFinder.js";
 import { ghReady, ghLoadAccount, ghLoadPRs } from "../composables/useGitHub.js";
 import { refresh } from "../composables/useCalendar.js";
@@ -108,15 +108,15 @@ watch(() => props.open, (isOpen) => {
 });
 
 const DAILY_MIN = 0.5, DAILY_MAX = 24;
+
+// Daily target and manday hours are local numbers the view models read straight
+// off config, so persisting is enough — neither needs a refetch.
 function stepTarget(delta){
-  const next = Math.min(DAILY_MAX, Math.max(DAILY_MIN, +(state.hoursPerDay + delta).toFixed(1)));
-  state.hoursPerDay = next;
+  const next = Math.min(DAILY_MAX, Math.max(DAILY_MIN, +(hoursPerDay.value + delta).toFixed(1)));
   state.config.hoursPerDay = next;
   saveConfig();
-  refresh();
 }
 
-// Manday hours — the stats read config reactively, so persisting is enough.
 function stepManday(delta){
   const next = Math.min(DAILY_MAX, Math.max(DAILY_MIN, +(mandayHours.value + delta).toFixed(1)));
   state.config.mandayHours = next;
@@ -197,8 +197,16 @@ function priorityRowInvalid(i){ return !isValidPriorityPattern(priorityRows.valu
 function addPriority(){ priorityRows.value.push(""); }
 function removePriority(i){ priorityRows.value.splice(i, 1); persistPriority(); }
 
+// Another workspace means other tasks, other sprints and other time entries, so
+// drop the caches that aren't already scoped by workspace. A Folder id belongs to
+// the workspace it was picked in and can't carry over either — clearing it makes
+// the Tasks tab ask for a new one instead of silently resolving no sprints.
 function applyClickUpSelect(){
+  state.config.sprintFolderId = "";
+  folders.value = [];
   saveConfig();
+  clearTaskPools();
+  clearTaskStats();
   refresh();
 }
 
@@ -222,14 +230,17 @@ async function connect(){
 
 function disconnect(){
   // Clear only the ClickUp credentials — every other preference survives.
-  Object.assign(state.config, { token: "", teamId: "", hoursPerDay: state.hoursPerDay });
+  Object.assign(state.config, { token: "", teamId: "" });
   state.cuUser = null;
   state.cuTeams = [];
-  // A different token may see a different workspace, so don't reuse the pool.
+  // A different token may see a different workspace, so don't reuse anything
+  // derived from this one.
   clearTaskPools();
+  clearTaskStats();
   state.entries.clear();
   state.onCall.clear();
   state.dayEntries = [];
+  state.tasks = [];
   // Drop the loaded-period markers too, so the calendar and day views treat the
   // next refresh as a first load rather than a silent one.
   state.entriesPeriod = "";
@@ -503,7 +514,7 @@ function disconnectGh(){
           </div>
           <div class="stepper">
             <button type="button" aria-label="Decrease" @click="stepTarget(-0.5)">−</button>
-            <div class="val">{{ state.hoursPerDay }} h</div>
+            <div class="val">{{ hoursPerDay }} h</div>
             <button type="button" aria-label="Increase" @click="stepTarget(0.5)">+</button>
           </div>
         </div>
