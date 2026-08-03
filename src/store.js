@@ -3,7 +3,7 @@ import { LS_KEY, VIEW_LS_KEY, VIEWS } from "./constants.js";
 import { startOfMonth, startOfDay, iso, monthKey } from "./utils/date.js";
 
 export function loadConfig(){
-  const defaults = { token: "", teamId: "", hoursPerDay: 8, mandayHours: 8, workStartHour: 8, workEndHour: 16, onCallTasks: [], excludeStatuses: [], priorityTasks: [], sprintFolderId: "", taskSort: "default", githubToken: "", githubOrg: "" };
+  const defaults = { token: "", teamId: "", hoursPerDay: 8, mandayHours: 8, workStartHour: 8, workEndHour: 16, onCallTasks: [], excludeStatuses: [], statusOrder: [], priorityStatuses: [], priorityTasks: [], sprintFolderId: "", taskSort: "default", githubToken: "", githubOrg: "" };
   try {
     const parsed = JSON.parse(localStorage.getItem(LS_KEY)) || {};
     // Legacy: the assignee used to be selectable. Everything is scoped to the

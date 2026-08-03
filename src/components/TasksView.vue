@@ -54,11 +54,13 @@ const SKELETON_GROUPS = [4, 3];
     <div v-else-if="!groups.length" class="list-empty">{{ emptyText }}</div>
 
     <div v-else class="task-groups">
-      <div v-for="g in groups" :key="g.name" class="task-group">
+      <div v-for="g in groups" :key="g.name" class="task-group" :class="{ priority: g.priority }">
         <div class="group-head">
           <span class="group-dot" :style="{ background: g.dotColor }"></span>
           <span class="group-name">{{ g.name }}</span>
           <span class="group-count">{{ g.tasks.length }}</span>
+          <!-- Colour alone shouldn't carry the meaning of the highlight. -->
+          <span v-if="g.priority" class="group-star" title="Priority status">★</span>
         </div>
         <div class="task-cards">
           <component

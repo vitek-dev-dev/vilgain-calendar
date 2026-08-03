@@ -2,8 +2,9 @@
 import { ref, computed, watch, nextTick } from "vue";
 import { state, saveConfig, setStatus, setCuPill, syncPill, workingHours, hoursPerDay, mandayHours } from "../store.js";
 import { pad } from "../utils/date.js";
-import { cuReady, cuLoadAccount, cuLoadTeams, cuLoadFolders, clearTaskStats, isValidOnCallPattern } from "../composables/useClickUp.js";
+import { cuReady, cuLoadAccount, cuLoadTeams, cuLoadFolders, cuLoadTasks, clearTaskStats, isValidOnCallPattern } from "../composables/useClickUp.js";
 import { isValidPriorityPattern, clearTaskPools } from "../composables/useTaskFinder.js";
+import { titleCase, statusRanks, statusOrderComparator } from "../composables/useTasksView.js";
 import { ghReady, ghLoadAccount, ghLoadPRs } from "../composables/useGitHub.js";
 import { refresh } from "../composables/useCalendar.js";
 
@@ -23,7 +24,6 @@ const tokenInput = ref("");
 const ghTokenInput = ref("");
 const ghOrgInput = ref("");
 const onCallRows = ref([]);
-const excludeRows = ref([]);
 const priorityRows = ref([]);
 const tokenEl = ref(null);
 const cuTeamsLoading = ref(false);
@@ -96,7 +96,6 @@ watch(() => props.open, (isOpen) => {
   ghTokenInput.value = state.config.githubToken || "";
   ghOrgInput.value = state.config.githubOrg || "";
   onCallRows.value = [...(state.config.onCallTasks || [])];
-  excludeRows.value = [...(state.config.excludeStatuses || [])];
   priorityRows.value = [...(state.config.priorityTasks || [])];
   // Guarded so reopening the dialog doesn't refetch what we already have, or fire
   // a second request while the first is still in flight. The workspace list is
@@ -152,15 +151,6 @@ function onCallRowInvalid(i){ return !isValidOnCallPattern(onCallRows.value[i]);
 function addOnCall(){ onCallRows.value.push(""); }
 function removeOnCall(i){ onCallRows.value.splice(i, 1); persistOnCall(); }
 
-// Exclude statuses (row editor) — the Tasks view model reads config reactively,
-// so persisting is enough (no refetch needed).
-function persistExclude(){
-  state.config.excludeStatuses = excludeRows.value.map(s => s.trim()).filter(Boolean);
-  saveConfig();
-}
-function addExclude(){ excludeRows.value.push(""); }
-function removeExclude(i){ excludeRows.value.splice(i, 1); persistExclude(); }
-
 // Sprint folder — loaded only when the Tasks tab is opened, since enumerating
 // folders costs a request per Space.
 const folders = ref([]);
@@ -178,7 +168,128 @@ async function loadFolders(){
   }
 }
 
-watch(activeTab, (tab) => { if (tab === "tasks") loadFolders(); });
+// Statuses editor — one list controlling both the group order and which groups
+// show at all. Statuses aren't enumerable workspace-wide in the v2 API, so the
+// list is built from the statuses the loaded tasks use; the Tasks tab loads them
+// if no view has yet.
+const statusesLoading = ref(false);
+
+async function loadStatuses(){
+  if (state.tasks.length || statusesLoading.value || !cuReady()) return;
+  statusesLoading.value = true;
+  try {
+    await cuLoadTasks();
+  } finally {
+    statusesLoading.value = false;
+  }
+}
+
+watch(activeTab, (tab) => {
+  if (tab !== "tasks") return;
+  loadFolders();
+  loadStatuses();
+});
+
+// Written straight through to config rather than copied into local rows: the list
+// is derived below, so every control's effect is the state the Tasks view reads.
+function statusKeys(names){
+  return new Set((names || []).map(s => String(s).trim().toLowerCase()).filter(Boolean));
+}
+const hiddenStatuses = computed(() => statusKeys(state.config.excludeStatuses));
+const priorityStatusKeys = computed(() => statusKeys(state.config.priorityStatuses));
+
+// Every status worth a row: the ones the loaded tasks sit in, plus any named in
+// settings that no current task uses (renamed in ClickUp, or all its tasks gone)
+// so a stored choice is never invisible. `raw` is the spelling that gets stored
+// and matched on, `name` the display form — the same one the group heading shows.
+const statusRows = computed(() => {
+  const rows = new Map();
+  for (const t of state.tasks){
+    const raw = t.statusName.trim();
+    const key = raw.toLowerCase();
+    if (!key || rows.has(key)) continue;
+    rows.set(key, {
+      key, raw, name: titleCase(raw), color: t.statusColor,
+      type: t.statusType, order: t.statusOrder,
+    });
+  }
+  for (const stored of [...(state.config.statusOrder || []), ...(state.config.excludeStatuses || [])]){
+    const raw = String(stored).trim();
+    const key = raw.toLowerCase();
+    if (!key || rows.has(key)) continue;
+    rows.set(key, {
+      key, raw, name: titleCase(raw), color: "#cbd5e1",
+      type: "", order: Infinity, missing: true,
+    });
+  }
+  // Hidden beats priority, so a hand-edited config that lists a status in both
+  // still reads as exactly one state (and the next click writes it back clean).
+  return [...rows.values()]
+    .sort(statusOrderComparator(statusRanks(state.config.statusOrder)))
+    .map(r => ({
+      ...r,
+      state: hiddenStatuses.value.has(r.key)
+        ? "hidden"
+        : priorityStatusKeys.value.has(r.key) ? "priority" : "shown",
+    }));
+});
+
+// Tallies the groups the Tasks view will actually draw, so an "unused" row is
+// counted as neither shown nor hidden — it has no tasks to appear with. Priority
+// rows are shown too; they are called out separately, not counted apart.
+const statusTally = computed(() => {
+  const rows = statusRows.value;
+  return {
+    shown: rows.filter(r => r.state !== "hidden" && !r.missing).length,
+    priority: rows.filter(r => r.state === "priority" && !r.missing).length,
+    hidden: rows.filter(r => r.state === "hidden").length,
+    unused: rows.filter(r => r.state !== "hidden" && r.missing).length,
+  };
+});
+
+const hasCustomOrder = computed(() => !!(state.config.statusOrder || []).length);
+
+// Shown → Priority → Hidden → Shown. One control because the three are one
+// decision: a hidden status draws nothing, so highlighting it means nothing.
+const NEXT_STATUS_STATE = { shown: "priority", priority: "hidden", hidden: "shown" };
+const STATUS_STATE_LABEL = { shown: "Shown", priority: "Priority", hidden: "Hidden" };
+const STATUS_STATE_HINT = {
+  shown: "Shown on the Tasks view. Click to highlight its section.",
+  priority: "Highlighted with a gold border on the Tasks view. Click to hide it.",
+  hidden: "Hidden from the Tasks view. Click to show it again.",
+};
+
+// Both lists are rewritten from scratch each time, which is what keeps the states
+// exclusive. Stored by name, so other rows keep the spelling they were saved with.
+function cycleStatus(row){
+  const next = NEXT_STATUS_STATE[row.state] || "shown";
+  const without = names => (names || []).filter(s => String(s).trim() && String(s).trim().toLowerCase() !== row.key);
+  const priority = without(state.config.priorityStatuses);
+  const hidden = without(state.config.excludeStatuses);
+  if (next === "priority") priority.push(row.raw);
+  if (next === "hidden") hidden.push(row.raw);
+  state.config.priorityStatuses = priority;
+  state.config.excludeStatuses = hidden;
+  saveConfig();
+}
+
+// Moving writes the whole list, so what you see is what the Tasks view does. A
+// status that appears in ClickUp later is still unlisted, and lands after these.
+function moveStatus(i, delta){
+  const rows = statusRows.value;
+  const to = i + delta;
+  if (to < 0 || to >= rows.length) return;
+  const order = rows.map(r => r.raw);
+  [order[i], order[to]] = [order[to], order[i]];
+  state.config.statusOrder = order;
+  saveConfig();
+}
+
+// Back to ClickUp's own order, keeping what is hidden hidden.
+function resetStatusOrder(){
+  state.config.statusOrder = [];
+  saveConfig();
+}
 
 // Changing it changes what counts as a sprint, so drop the cached pools and the
 // list metadata derived from the old setting.
@@ -488,20 +599,83 @@ function disconnectGh(){
           <button class="row-add" type="button" @click="addPriority">＋ Add pattern</button>
         </div>
 
-        <!-- Exclude statuses -->
-        <div class="set-card">
+        <!-- Statuses: order + visibility -->
+        <div class="set-card status-card">
           <div>
-            <div class="set-label">Exclude statuses</div>
-            <div class="set-help">Tasks in these ClickUp statuses are hidden from the Tasks view.</div>
-          </div>
-          <div v-if="excludeRows.length" class="list-rows">
-            <div v-for="(_, i) in excludeRows" :key="i" class="list-row">
-              <input v-model="excludeRows[i]" type="text" autocomplete="off" placeholder="Status" @change="persistExclude">
-              <button class="row-remove" type="button" aria-label="Remove" @click="removeExclude(i)">−</button>
+            <div class="set-label">Statuses</div>
+            <div class="set-help">
+              The order status groups appear in on the Tasks view, and how each one appears.
+              Click a status to cycle it: <strong>Shown</strong> → <strong>Priority</strong>,
+              which draws a gold border around its whole section →
+              <strong>Hidden</strong>, which leaves its tasks out of the list and its count.
+              Statuses you haven't moved keep ClickUp's own order underneath the ones you have.
             </div>
           </div>
-          <div v-else class="list-empty-note">No excluded statuses yet.</div>
-          <button class="row-add" type="button" @click="addExclude">＋ Add status</button>
+
+          <div v-if="statusRows.length" class="list-rows list-rows-scroll">
+            <div
+              v-for="(row, i) in statusRows"
+              :key="row.key"
+              class="list-row"
+              :class="[`row-${row.state}`]"
+            >
+              <span class="row-num" aria-hidden="true">{{ i + 1 }}</span>
+              <span class="row-name" :class="{ missing: row.missing }">
+                <span class="group-dot" :style="{ background: row.color }" aria-hidden="true"></span>
+                <span class="row-name-text" :title="row.name">{{ row.name }}</span>
+                <span
+                  v-if="row.missing"
+                  class="row-note"
+                  title="No loaded task uses this status — kept so your choice isn't lost."
+                >unused</span>
+              </span>
+              <button
+                class="row-vis"
+                :class="`vis-${row.state}`"
+                type="button"
+                :aria-label="`${row.name}: ${STATUS_STATE_LABEL[row.state]}`"
+                :title="STATUS_STATE_HINT[row.state]"
+                @click="cycleStatus(row)"
+              >{{ STATUS_STATE_LABEL[row.state] }}</button>
+              <button
+                class="row-move"
+                type="button"
+                :disabled="i === 0"
+                :aria-label="`Move ${row.name} up`"
+                @click="moveStatus(i, -1)"
+              >↑</button>
+              <button
+                class="row-move"
+                type="button"
+                :disabled="i === statusRows.length - 1"
+                :aria-label="`Move ${row.name} down`"
+                @click="moveStatus(i, 1)"
+              >↓</button>
+            </div>
+          </div>
+          <div v-else class="list-empty-note">
+            {{ statusesLoading
+              ? "Loading your statuses…"
+              : connected
+                ? "No statuses yet — they're read from your tasks."
+                : "Connect ClickUp to list your statuses." }}
+          </div>
+
+          <div v-if="statusRows.length" class="status-foot">
+            <span class="status-count" title="Counted as the Tasks view will draw them — priority statuses are shown too.">
+              {{ statusTally.shown }} shown<!--
+              --><template v-if="statusTally.priority">, {{ statusTally.priority }} priority</template><!--
+              --><template v-if="statusTally.hidden">, {{ statusTally.hidden }} hidden</template><!--
+              --><template v-if="statusTally.unused">, {{ statusTally.unused }} unused</template>
+            </span>
+            <button
+              v-if="hasCustomOrder"
+              class="link-btn muted"
+              type="button"
+              title="Drop the custom order and follow ClickUp's; hidden statuses stay hidden."
+              @click="resetStatusOrder"
+            >Reset order</button>
+          </div>
         </div>
       </template>
 
