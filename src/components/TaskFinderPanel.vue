@@ -3,8 +3,13 @@ import { ref, computed, watch, nextTick, onUnmounted } from "vue";
 import { state, saveConfig } from "../store.js";
 import { cuReady, cuTaskStats } from "../composables/useClickUp.js";
 import {
-  useTaskFinder, searchTasks, sortHits, isPriorityTask,
-  SORT_MODES, parseTaskRef, cuGetTask,
+  useTaskFinder,
+  searchTasks,
+  sortHits,
+  isPriorityTask,
+  SORT_MODES,
+  parseTaskRef,
+  cuGetTask,
 } from "../composables/useTaskFinder.js";
 
 // The task search itself — input, filters and result list — with no dialog
@@ -39,7 +44,9 @@ let resolveTimer = null;
 const connected = computed(() => cuReady());
 
 // Sort mode is persisted — it is a working preference, not a per-open choice.
-const sortMode = ref(SORT_MODES.some(m => m.key === state.config.taskSort) ? state.config.taskSort : "default");
+const sortMode = ref(
+  SORT_MODES.some(m => m.key === state.config.taskSort) ? state.config.taskSort : "default",
+);
 
 // Per-task hours / last-worked for the current calendar month. Free when the
 // calendar already loaded that month; one request otherwise. Only the two
@@ -47,7 +54,7 @@ const sortMode = ref(SORT_MODES.some(m => m.key === state.config.taskSort) ? sta
 const NEEDS_STATS = new Set(["worked", "recent"]);
 const monthStats = ref(new Map());
 
-async function loadStats(){
+async function loadStats() {
   if (!cuReady()) return;
   const now = new Date();
   try {
@@ -57,7 +64,7 @@ async function loadStats(){
   }
 }
 
-function setSort(key){
+function setSort(key) {
   sortMode.value = key;
   state.config.taskSort = key;
   saveConfig();
@@ -86,14 +93,14 @@ const results = computed(() => {
   return resolved.value ? list.filter(t => t.id !== resolved.value.id) : list;
 });
 
-function shortDate(ms){
+function shortDate(ms) {
   const d = new Date(ms);
   return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
 // Whatever figure the active sort is ordering by, shown on the row so the order
 // is legible rather than mysterious.
-function statLabel(task){
+function statLabel(task) {
   if (sortMode.value === "updated") return task.dateUpdated ? shortDate(task.dateUpdated) : "";
   const s = monthStats.value.get(task.id);
   if (!s) return "";
@@ -111,18 +118,22 @@ const rows = computed(() => {
   return out;
 });
 
-watch(() => props.active, (isActive) => {
-  if (!isActive) return;
-  query.value = "";
-  activeIndex.value = 0;
-  resolved.value = null;
-  resolveError.value = "";
-  // Revalidate on every open: the cached list shows at once and is replaced when
-  // the fresh one lands.
-  load({ includeClosed: includeClosed.value, force: true });
-  if (NEEDS_STATS.has(sortMode.value)) loadStats();
-  if (props.autofocus) nextTick(() => inputEl.value?.focus());
-}, { immediate: true });
+watch(
+  () => props.active,
+  isActive => {
+    if (!isActive) return;
+    query.value = "";
+    activeIndex.value = 0;
+    resolved.value = null;
+    resolveError.value = "";
+    // Revalidate on every open: the cached list shows at once and is replaced when
+    // the fresh one lands.
+    load({ includeClosed: includeClosed.value, force: true });
+    if (NEEDS_STATS.has(sortMode.value)) loadStats();
+    if (props.autofocus) nextTick(() => inputEl.value?.focus());
+  },
+  { immediate: true },
+);
 
 watch(includeClosed, () => {
   if (!props.active) return;
@@ -132,20 +143,23 @@ watch(includeClosed, () => {
 
 // Typing resets the cursor to the top row and re-arms the link/id resolver. The
 // token guards against an earlier, slower lookup overwriting a later one.
-watch(query, (q) => {
+watch(query, q => {
   activeIndex.value = 0;
   clearTimeout(resolveTimer);
   resolved.value = null;
   resolveError.value = "";
   const taskRef = parseTaskRef(q);
-  if (!taskRef || !connected.value){ resolving.value = false; return; }
+  if (!taskRef || !connected.value) {
+    resolving.value = false;
+    return;
+  }
   resolving.value = true;
   const token = ++resolveToken;
   resolveTimer = setTimeout(async () => {
     try {
       const task = await cuGetTask(taskRef);
       if (token === resolveToken) resolved.value = task;
-    } catch (err){
+    } catch (err) {
       if (token === resolveToken) resolveError.value = err.message;
     } finally {
       if (token === resolveToken) resolving.value = false;
@@ -155,7 +169,7 @@ watch(query, (q) => {
 
 onUnmounted(() => clearTimeout(resolveTimer));
 
-function move(delta){
+function move(delta) {
   const n = rows.value.length;
   if (!n) return;
   activeIndex.value = (activeIndex.value + delta + n) % n;
@@ -164,18 +178,18 @@ function move(delta){
   });
 }
 
-function choose(row){
+function choose(row) {
   emit("select", row.task);
 }
 
-function chooseActive(){
+function chooseActive() {
   const row = rows.value[activeIndex.value];
   if (row) choose(row);
 }
 
 // Carried-over tasks sit in several sprints; the chip shows the live one and the
 // tooltip spells out the whole run.
-function sprintTitle(t){
+function sprintTitle(t) {
   if (t.sprintIsFolder) return `Folder: ${t.sprint} — not in a sprint`;
   const run = t.sprints.length > 1 ? `\nAll sprints: ${t.sprints.join(" → ")}` : "";
   return t.sprintIsCurrent
@@ -183,14 +197,17 @@ function sprintTitle(t){
     : `Sprint: ${t.sprint} (not the current one)${run}`;
 }
 
-function sprintIcon(t){
+function sprintIcon(t) {
   if (t.sprintIsFolder) return "📁";
   return t.sprintIsCurrent ? "🏃" : "🕓";
 }
 
 // The sprint gets its own chip, so keep it out of the breadcrumb it came from.
-function breadcrumb(t){
-  return [t.folder, t.list].filter(Boolean).filter(name => name !== t.sprint).join(" / ");
+function breadcrumb(t) {
+  return [t.folder, t.list]
+    .filter(Boolean)
+    .filter(name => name !== t.sprint)
+    .join(" / ");
 }
 </script>
 
@@ -209,7 +226,7 @@ function breadcrumb(t){
         @keydown.down.prevent="move(1)"
         @keydown.up.prevent="move(-1)"
         @keydown.enter.prevent="chooseActive"
-      >
+      />
     </div>
 
     <div class="finder-filters">
@@ -220,10 +237,12 @@ function breadcrumb(t){
           type="button"
           :class="{ active: sortMode === m.key }"
           @click="setSort(m.key)"
-        >{{ m.label }}</button>
+        >
+          {{ m.label }}
+        </button>
       </div>
       <label class="finder-check">
-        <input type="checkbox" v-model="includeClosed">
+        <input type="checkbox" v-model="includeClosed" />
         Include closed
       </label>
       <button
@@ -234,7 +253,9 @@ function breadcrumb(t){
         aria-label="Reload tasks from ClickUp"
         :disabled="loading || refreshing || !connected"
         @click="load({ includeClosed, force: true })"
-      >↻</button>
+      >
+        ↻
+      </button>
     </div>
 
     <div ref="listEl" class="finder-list">
@@ -250,24 +271,44 @@ function breadcrumb(t){
         @mousemove="activeIndex = i"
         @click="choose(row)"
       >
-        <span class="finder-dot" :style="{ background: row.task.statusColor }" aria-hidden="true"></span>
+        <span
+          class="finder-dot"
+          :style="{ background: row.task.statusColor }"
+          aria-hidden="true"
+        ></span>
         <span class="finder-main">
           <span class="finder-title">
-            <span v-if="isPriorityTask(row.task)" class="finder-pin" title="Priority task" aria-hidden="true">📌</span>
+            <span
+              v-if="isPriorityTask(row.task)"
+              class="finder-pin"
+              title="Priority task"
+              aria-hidden="true"
+              >📌</span
+            >
             {{ row.task.title }}
           </span>
           <span class="finder-sub">
             <span
               v-if="row.task.sprint"
               class="finder-sprint"
-              :class="{ folder: row.task.sprintIsFolder, past: !row.task.sprintIsFolder && !row.task.sprintIsCurrent }"
+              :class="{
+                folder: row.task.sprintIsFolder,
+                past: !row.task.sprintIsFolder && !row.task.sprintIsCurrent,
+              }"
               :title="sprintTitle(row.task)"
             >
-              <span aria-hidden="true">{{ sprintIcon(row.task) }}</span>{{ row.task.sprint }}
-              <span v-if="row.task.sprints.length > 1" class="finder-sprint-more">+{{ row.task.sprints.length - 1 }}</span>
+              <span aria-hidden="true">{{ sprintIcon(row.task) }}</span
+              >{{ row.task.sprint }}
+              <span v-if="row.task.sprints.length > 1" class="finder-sprint-more"
+                >+{{ row.task.sprints.length - 1 }}</span
+              >
             </span>
             <span v-if="row.task.statusName" class="finder-status">{{ row.task.statusName }}</span>
-            <span v-if="row.task.statusName && (breadcrumb(row.task) || row.task.customId)" class="dotsep">·</span>
+            <span
+              v-if="row.task.statusName && (breadcrumb(row.task) || row.task.customId)"
+              class="dotsep"
+              >·</span
+            >
             <span v-if="breadcrumb(row.task)">{{ breadcrumb(row.task) }}</span>
             <span v-if="breadcrumb(row.task) && row.task.customId" class="dotsep">·</span>
             <span v-if="row.task.customId" class="finder-cid">{{ row.task.customId }}</span>
@@ -279,9 +320,14 @@ function breadcrumb(t){
       </button>
 
       <div v-if="resolving" class="finder-msg">Looking up that task…</div>
-      <div v-else-if="resolveError" class="finder-msg finder-msg-err">Task lookup failed: {{ resolveError }}</div>
+      <div v-else-if="resolveError" class="finder-msg finder-msg-err">
+        Task lookup failed: {{ resolveError }}
+      </div>
 
-      <div v-if="!loading && !error && !results.length && !resolved && !resolving" class="finder-msg">
+      <div
+        v-if="!loading && !error && !results.length && !resolved && !resolving"
+        class="finder-msg"
+      >
         <template v-if="query">No task matches “{{ query }}”.</template>
         <template v-else>No tasks in this workspace.</template>
       </div>
@@ -289,7 +335,8 @@ function breadcrumb(t){
 
     <div class="finder-foot">
       <span v-if="truncated">
-        Showing the {{ tasks.length }} most recently updated tasks — paste a task link or ID to reach any other.
+        Showing the {{ tasks.length }} most recently updated tasks — paste a task link or ID to
+        reach any other.
       </span>
       <span v-else-if="connected">Assigned to me · ↑↓ to move · Enter to select</span>
       <span v-else>Connect ClickUp in settings (⚙) to search tasks.</span>

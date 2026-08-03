@@ -1,0 +1,9 @@
+node_modules
+dist
+package-lock.json
+
+# Deliberately excluded: this stylesheet is written one rule per line, grouped
+# into labelled sections. Prettier has no compact mode for CSS — it puts every
+# declaration on its own line, which turns 867 lines into ~2500 and loses the
+# grouping the file is organised around. Delete this line to opt in.
+src/style.css

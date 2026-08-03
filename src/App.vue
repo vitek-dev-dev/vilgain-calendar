@@ -1,6 +1,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
-import { state, setStatus, syncPill, viewFromHash, isLoading, nowTick, NOW_TICK_MS } from "./store.js";
+import {
+  state,
+  setStatus,
+  syncPill,
+  viewFromHash,
+  isLoading,
+  nowTick,
+  NOW_TICK_MS,
+} from "./store.js";
 import { iso } from "./utils/date.js";
 import { cuReady, cuLoadUser } from "./composables/useClickUp.js";
 import { prewarmTaskPool } from "./composables/useTaskFinder.js";
@@ -30,37 +38,44 @@ const logTimeOpen = ref(false);
 // previous slot's range never leaks into a plain "Log time" click.
 const logTimePreset = ref({});
 
-function openLogTime(preset){
+function openLogTime(preset) {
   logTimePreset.value = preset || {};
   logTimeOpen.value = true;
 }
 
 // A free slot on the day timeline logs against that exact window on that day.
-function onLogSlot({ start, end }){
+function onLogSlot({ start, end }) {
   openLogTime({ dateIso: iso(state.dayCursor), start, end });
 }
 
-function onKeydown(e){
-  if (e.key === "Escape" && settingsOpen.value){
+function onKeydown(e) {
+  if (e.key === "Escape" && settingsOpen.value) {
     settingsOpen.value = false;
     e.preventDefault();
     return;
   }
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
   // "l" opens the log dialog from any view; the modals own Escape themselves.
-  if (!logTimeOpen.value && !settingsOpen.value && (e.key === "l" || e.key === "L") && !e.metaKey && !e.ctrlKey && !e.altKey){
+  if (
+    !logTimeOpen.value &&
+    !settingsOpen.value &&
+    (e.key === "l" || e.key === "L") &&
+    !e.metaKey &&
+    !e.ctrlKey &&
+    !e.altKey
+  ) {
     openLogTime();
     e.preventDefault();
     return;
   }
   // Don't navigate the calendar underneath an open overlay.
   if (logTimeOpen.value || settingsOpen.value) return;
-  if (state.view === "day"){
+  if (state.view === "day") {
     if (e.key === "ArrowLeft") shiftDay(-1);
     else if (e.key === "ArrowRight") shiftDay(1);
     return;
   }
-  if (state.view === "month"){
+  if (state.view === "month") {
     if (e.key === "ArrowLeft") shiftMonth(-1);
     else if (e.key === "ArrowRight") shiftMonth(1);
   }
@@ -68,7 +83,7 @@ function onKeydown(e){
 
 let nowTimer = null;
 
-function onHashChange(){
+function onHashChange() {
   const v = viewFromHash();
   if (v && v !== state.view) setView(v, { skipHash: true });
 }
@@ -76,8 +91,12 @@ function onHashChange(){
 onMounted(async () => {
   syncPill(cuReady());
   const initialHash = "#" + state.view;
-  if (location.hash !== initialHash){
-    try { history.replaceState(null, "", initialHash); } catch { location.hash = initialHash; }
+  if (location.hash !== initialHash) {
+    try {
+      history.replaceState(null, "", initialHash);
+    } catch {
+      location.hash = initialHash;
+    }
   }
   setView(state.view, { skipHash: true });
 
@@ -85,14 +104,16 @@ onMounted(async () => {
   window.addEventListener("hashchange", onHashChange);
   // Keeps the day timeline's now line and trailing free slot moving without a
   // reload. Only the clock is republished — no data is refetched.
-  nowTimer = setInterval(() => { nowTick.value = Date.now(); }, NOW_TICK_MS);
+  nowTimer = setInterval(() => {
+    nowTick.value = Date.now();
+  }, NOW_TICK_MS);
 
   // Only the ClickUp *identity* is loaded here — task queries are scoped by the
   // user's id, so it is needed before any data lands. The workspace list
   // (GET /team) and the GitHub account (GET /user) are read by nothing outside
   // the Settings dialog, which fetches them when it opens: data calls use the
   // stored `teamId`, and the PR list scopes itself with `author:@me`.
-  if (state.config.token){
+  if (state.config.token) {
     try {
       await cuLoadUser();
       syncPill(cuReady());
@@ -100,7 +121,7 @@ onMounted(async () => {
       // against a populated list. Deliberately not awaited — the current view's
       // own data must not wait behind it.
       prewarmTaskPool();
-    } catch (err){
+    } catch (err) {
       setStatus("ClickUp: " + err.message);
     }
   }
@@ -137,7 +158,10 @@ onUnmounted(() => {
       @click="settingsOpen = true"
     >
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-        <path fill="currentColor" d="M19.14 12.94a7.49 7.49 0 0 0 .05-.94 7.49 7.49 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.3 7.3 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.3 7.3 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.65 8.48a.5.5 0 0 0 .12.64L4.8 10.7c-.03.31-.05.62-.05.94s.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.43.34.68.22l2.39-.96c.5.39 1.05.71 1.63.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.58-.23 1.13-.55 1.63-.94l2.39.96c.25.1.54 0 .68-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.04-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
+        <path
+          fill="currentColor"
+          d="M19.14 12.94a7.49 7.49 0 0 0 .05-.94 7.49 7.49 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.3 7.3 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.3 7.3 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.65 8.48a.5.5 0 0 0 .12.64L4.8 10.7c-.03.31-.05.62-.05.94s.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.43.34.68.22l2.39-.96c.5.39 1.05.71 1.63.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.58-.23 1.13-.55 1.63-.94l2.39.96c.25.1.54 0 .68-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.04-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
+        />
       </svg>
     </button>
 

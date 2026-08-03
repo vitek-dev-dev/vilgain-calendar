@@ -1,7 +1,9 @@
 import { state, setStatus, setCuPill } from "../store.js";
 import { iso, monthKey } from "../utils/date.js";
 
-export function cuReady(){ return !!(state.config.token && state.config.teamId); }
+export function cuReady() {
+  return !!(state.config.token && state.config.teamId);
+}
 
 // On-call task names are user-supplied regexes, matched case-insensitively and
 // unanchored (use ^…$ for an exact match). Compiled patterns are cached because
@@ -9,21 +11,25 @@ export function cuReady(){ return !!(state.config.token && state.config.teamId);
 // match.
 const onCallReCache = new Map();
 
-function onCallRegex(pattern){
+function onCallRegex(pattern) {
   if (onCallReCache.has(pattern)) return onCallReCache.get(pattern);
   let re = null;
-  try { re = new RegExp(pattern, "i"); } catch { re = null; }
+  try {
+    re = new RegExp(pattern, "i");
+  } catch {
+    re = null;
+  }
   onCallReCache.set(pattern, re);
   return re;
 }
 
 // Blank patterns count as valid so a freshly added, still-empty row isn't flagged.
-export function isValidOnCallPattern(pattern){
+export function isValidOnCallPattern(pattern) {
   const p = String(pattern ?? "").trim();
   return !p || !!onCallRegex(p);
 }
 
-export function isOnCallTask(name){
+export function isOnCallTask(name) {
   if (!name) return false;
   const n = String(name).trim();
   if (!n) return false;
@@ -35,14 +41,14 @@ export function isOnCallTask(name){
   });
 }
 
-export async function cuFetch(path, params){
+export async function cuFetch(path, params) {
   const token = state.config.token;
   if (!token) throw new Error("Missing ClickUp token");
-  const qs = params ? ("?" + new URLSearchParams(params)) : "";
+  const qs = params ? "?" + new URLSearchParams(params) : "";
   const res = await fetch(`https://api.clickup.com/api/v2${path}${qs}`, {
-    headers: { "Authorization": token, "Accept": "application/json" },
+    headers: { Authorization: token, Accept: "application/json" },
   });
-  if (!res.ok){
+  if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`ClickUp ${res.status}${body ? ": " + body.slice(0, 200) : ""}`);
   }
@@ -53,7 +59,7 @@ export async function cuFetch(path, params){
 // (POST /team/{teamId}/time_entries). `start` and `duration` are epoch ms.
 // Attaches to a task when `taskId` is given, otherwise logs a description-only
 // entry. The entry belongs to the token owner.
-export async function cuCreateTimeEntry({ start, stop, duration, description, taskId, billable }){
+export async function cuCreateTimeEntry({ start, stop, duration, description, taskId, billable }) {
   const token = state.config.token;
   if (!token) throw new Error("Missing ClickUp token");
   if (!state.config.teamId) throw new Error("No workspace selected");
@@ -62,16 +68,19 @@ export async function cuCreateTimeEntry({ start, stop, duration, description, ta
   const body = { start, stop, duration, billable: !!billable };
   if (description) body.description = description;
   if (taskId) body.tid = taskId;
-  const res = await fetch(`https://api.clickup.com/api/v2/team/${state.config.teamId}/time_entries`, {
-    method: "POST",
-    headers: {
-      "Authorization": token,
-      "Content-Type": "application/json",
-      "Accept": "application/json",
+  const res = await fetch(
+    `https://api.clickup.com/api/v2/team/${state.config.teamId}/time_entries`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: token,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok){
+  );
+  if (!res.ok) {
     const b = await res.text().catch(() => "");
     throw new Error(`ClickUp ${res.status}${b ? ": " + b.slice(0, 200) : ""}`);
   }
@@ -81,7 +90,7 @@ export async function cuCreateTimeEntry({ start, stop, duration, description, ta
 // Log a single entry spanning the local clock times `start`–`end` ("HH:MM") on
 // `dateIso` ("YYYY-MM-DD"). An end at or before the start rolls over to the next
 // day, so an overnight range like 16:00–00:00 lands where you'd expect.
-export async function cuLogTimeRange({ dateIso, start, end, description, taskId, billable }){
+export async function cuLogTimeRange({ dateIso, start, end, description, taskId, billable }) {
   if (!cuReady()) throw new Error("Connect ClickUp first");
   const [y, mo, d] = String(dateIso).split("-").map(Number);
   const [sh, sm] = String(start).split(":").map(Number);
@@ -109,28 +118,40 @@ export async function cuLogTimeRange({ dateIso, start, end, description, taskId,
 let userRequest = null;
 let teamsRequest = null;
 
-export async function cuLoadUser(){
+export async function cuLoadUser() {
   if (userRequest) return userRequest;
-  userRequest = cuFetch("/user").then(u => { state.cuUser = u.user; });
-  try { return await userRequest; } finally { userRequest = null; }
+  userRequest = cuFetch("/user").then(u => {
+    state.cuUser = u.user;
+  });
+  try {
+    return await userRequest;
+  } finally {
+    userRequest = null;
+  }
 }
 
-export async function cuLoadTeams(){
+export async function cuLoadTeams() {
   if (teamsRequest) return teamsRequest;
-  teamsRequest = cuFetch("/team").then(t => { state.cuTeams = t.teams || []; });
-  try { return await teamsRequest; } finally { teamsRequest = null; }
+  teamsRequest = cuFetch("/team").then(t => {
+    state.cuTeams = t.teams || [];
+  });
+  try {
+    return await teamsRequest;
+  } finally {
+    teamsRequest = null;
+  }
 }
 
 // A first connect needs both: the identity to scope task queries, and the
 // workspace list to auto-select one.
-export function cuLoadAccount(){
+export function cuLoadAccount() {
   return Promise.all([cuLoadUser(), cuLoadTeams()]);
 }
 
 // The authenticated user's id. Task queries are always scoped to it — omitting
 // `assignees[]` would return the whole workspace — so it is loaded on demand
 // when a view fetches before the boot-time user load has landed.
-export async function cuMyUserId(){
+export async function cuMyUserId() {
   if (!state.cuUser) await cuLoadUser();
   return state.cuUser ? String(state.cuUser.id) : "";
 }
@@ -140,21 +161,26 @@ export async function cuMyUserId(){
 // it costs one request per Space.
 let foldersCache = null; // { teamId, folders }
 
-export async function cuLoadFolders(){
+export async function cuLoadFolders() {
   const teamId = String(state.config.teamId || "");
   if (!teamId) return [];
   if (foldersCache && foldersCache.teamId === teamId) return foldersCache.folders;
   const spaces = (await cuFetch(`/team/${teamId}/space`, { archived: "false" })).spaces || [];
-  const perSpace = await Promise.all(spaces.map(s =>
-    cuFetch(`/space/${s.id}/folder`, { archived: "false" })
-      .then(j => (j.folders || []).map(f => ({
-        id: String(f.id),
-        name: f.name || "",
-        space: s.name || "",
-      })))
-      .catch(() => []),
-  ));
-  const folders = perSpace.flat()
+  const perSpace = await Promise.all(
+    spaces.map(s =>
+      cuFetch(`/space/${s.id}/folder`, { archived: "false" })
+        .then(j =>
+          (j.folders || []).map(f => ({
+            id: String(f.id),
+            name: f.name || "",
+            space: s.name || "",
+          })),
+        )
+        .catch(() => []),
+    ),
+  );
+  const folders = perSpace
+    .flat()
     .sort((a, b) => (a.space + a.name).localeCompare(b.space + b.name));
   foldersCache = { teamId, folders };
   return folders;
@@ -166,9 +192,9 @@ export async function cuLoadFolders(){
 // costs a request (cuTaskStats below).
 const taskStatsByPeriod = new Map();
 
-function bucketTaskStats(list){
+function bucketTaskStats(list) {
   const stats = new Map();
-  for (const e of list){
+  for (const e of list) {
     const id = e.task && e.task.id;
     if (!id) continue;
     const cur = stats.get(id) || { hours: 0, last: 0 };
@@ -181,7 +207,7 @@ function bucketTaskStats(list){
 
 // Time-entry totals per task for the given month, served from what the calendar
 // already loaded when possible.
-export async function cuTaskStats(year, month){
+export async function cuTaskStats(year, month) {
   const period = monthKey(new Date(year, month, 1));
   if (taskStatsByPeriod.has(period)) return taskStatsByPeriod.get(period);
   if (!cuReady()) return new Map();
@@ -196,20 +222,22 @@ export async function cuTaskStats(year, month){
   return stats;
 }
 
-export function clearTaskStats(){ taskStatsByPeriod.clear(); }
+export function clearTaskStats() {
+  taskStatsByPeriod.clear();
+}
 
-export async function cuLoadTimeEntries(year, month){
+export async function cuLoadTimeEntries(year, month) {
   const period = monthKey(new Date(year, month, 1));
   // Only drop what is on screen when the fetch is for a different month — that
   // data describes another period and would be wrong here. Re-fetching the month
   // already displayed keeps it visible until the new data lands, so a background
   // refresh never blanks the grid (same idea as cuLoadTasks).
-  if (state.entriesPeriod !== period){
+  if (state.entriesPeriod !== period) {
     state.entries.clear();
     state.onCall.clear();
     state.entriesPeriod = "";
   }
-  if (!cuReady()){
+  if (!cuReady()) {
     state.entries.clear();
     state.onCall.clear();
     // Resolved for this period — there is simply nothing to show without a
@@ -241,8 +269,9 @@ export async function cuLoadTimeEntries(year, month){
     if (monthKey(state.cursor) !== period) return;
     // Bucket into fresh maps first, then swap in one synchronous go — the grid
     // never renders a half-filled month.
-    const entries = new Map(), onCall = new Map();
-    for (const e of list){
+    const entries = new Map();
+    const onCall = new Map();
+    for (const e of list) {
       const start = new Date(Number(e.start));
       const key = iso(start);
       const hours = Math.max(0, Number(e.duration) || 0) / 3600000;
@@ -254,22 +283,22 @@ export async function cuLoadTimeEntries(year, month){
     state.onCall = onCall;
     state.entriesPeriod = period;
     setCuPill("ok", `ClickUp: ${list.length} entries`);
-  } catch (err){
+  } catch (err) {
     // Keep whatever is already on screen rather than emptying the month.
     setCuPill("err", "ClickUp: error");
     setStatus("ClickUp: " + err.message);
   }
 }
 
-export async function cuLoadDayEntries(){
+export async function cuLoadDayEntries() {
   const d = state.dayCursor;
   const dayKey = iso(d);
   // Same rule as the month grid: only clear when we are moving to another day.
-  if (state.dayEntriesKey !== dayKey){
+  if (state.dayEntriesKey !== dayKey) {
     state.dayEntries = [];
     state.dayEntriesKey = "";
   }
-  if (!cuReady()){
+  if (!cuReady()) {
     state.dayEntries = [];
     state.dayEntriesKey = dayKey;
     return;
@@ -292,7 +321,7 @@ export async function cuLoadDayEntries(){
     const dayStartMs = dayStart.getTime();
     const nextMidnightMs = dayStartMs + 24 * 3600000;
     const entries = [];
-    for (const e of list){
+    for (const e of list) {
       const startMs = Number(e.start);
       if (!Number.isFinite(startMs)) continue;
       const durMs = Math.max(0, Number(e.duration) || 0);
@@ -325,8 +354,11 @@ export async function cuLoadDayEntries(){
     entries.sort((a, b) => a.start.getTime() - b.start.getTime());
     state.dayEntries = entries;
     state.dayEntriesKey = dayKey;
-    setCuPill("ok", `ClickUp: ${entries.length} ${entries.length === 1 ? "entry" : "entries"} this day`);
-  } catch (err){
+    setCuPill(
+      "ok",
+      `ClickUp: ${entries.length} ${entries.length === 1 ? "entry" : "entries"} this day`,
+    );
+  } catch (err) {
     // Keep the timeline as it is rather than emptying it.
     setCuPill("err", "ClickUp: error");
     setStatus("ClickUp: " + err.message);
@@ -336,7 +368,7 @@ export async function cuLoadDayEntries(){
 // Normalize a ClickUp task into the flat shape the Tasks view consumes. Status
 // name/color and priority come straight from ClickUp so real workspace statuses
 // (and their colors) drive the grouping rather than a fixed set.
-function normalizeTask(t){
+function normalizeTask(t) {
   const status = t.status || {};
   const prio = t.priority && t.priority.priority ? String(t.priority.priority) : "";
   const spentMs = Math.max(0, Number(t.time_spent) || 0);
@@ -360,16 +392,19 @@ function normalizeTask(t){
 // Load open + closed tasks assigned to the current user across the workspace,
 // via the "Get Filtered Team Tasks" endpoint.
 // Paginated (100/page); we bucket by status in the view model.
-export async function cuLoadTasks(){
+export async function cuLoadTasks() {
   // Keep any previously loaded tasks visible while we refetch — only reset the
   // list when there is nothing to show (ClickUp not connected). The fetched data
   // replaces the list atomically below, and on error we keep the stale data.
-  if (!cuReady()){ state.tasks = []; return; }
+  if (!cuReady()) {
+    state.tasks = [];
+    return;
+  }
   const all = [];
   try {
     const assignee = await cuMyUserId();
     if (!assignee) throw new Error("couldn't identify your account");
-    for (let page = 0; page < 10; page++){
+    for (let page = 0; page < 10; page++) {
       const params = new URLSearchParams();
       params.set("page", String(page));
       params.set("include_closed", "true");
@@ -383,7 +418,7 @@ export async function cuLoadTasks(){
     }
     state.tasks = all.map(normalizeTask);
     setCuPill("ok", `ClickUp: ${all.length} ${all.length === 1 ? "task" : "tasks"}`);
-  } catch (err){
+  } catch (err) {
     setCuPill("err", "ClickUp: error");
     setStatus("ClickUp: " + err.message);
   }

@@ -8,11 +8,11 @@ import { iso, daysInMonth, monthKey } from "../utils/date.js";
 // view both ask for the same month, and navigating back re-asks).
 const loaded = new Map(); // "YYYY-MM" -> in-flight or settled request
 
-export function loadHolidays(year, month){
+export function loadHolidays(year, month) {
   const first = new Date(year, month, 1);
   const period = monthKey(first);
   let request = loaded.get(period);
-  if (!request){
+  if (!request) {
     request = fetchMonth(first).catch(err => {
       loaded.delete(period); // let the next visit retry
       setStatus("Holidays could not be loaded: " + err.message);
@@ -22,13 +22,13 @@ export function loadHolidays(year, month){
   return request;
 }
 
-async function fetchMonth(first){
+async function fetchMonth(first) {
   const url = `https://svatkyapi.cz/api/day/${iso(first)}/interval/${daysInMonth(first)}`;
   const res = await fetch(url, { cache: "force-cache" });
   if (!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
   const days = Array.isArray(data) ? data : Array.isArray(data?.days) ? data.days : [data];
-  for (const d of days){
+  for (const d of days) {
     if (d && d.isHoliday && d.date) state.holidays.set(d.date, d.holidayName || "Public holiday");
   }
 }

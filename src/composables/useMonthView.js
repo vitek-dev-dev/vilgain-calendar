@@ -1,13 +1,20 @@
 import { computed } from "vue";
 import { state, hoursPerDay, mandayHours } from "../store.js";
-import { mondayIndex, isoWeekNumber, iso, sameDay, daysInMonth, formatHours } from "../utils/date.js";
+import {
+  mondayIndex,
+  isoWeekNumber,
+  iso,
+  sameDay,
+  daysInMonth,
+  formatHours,
+} from "../utils/date.js";
 import { cuReady } from "./useClickUp.js";
 
 // Decide which numbers show inside a day cell, mirroring the original buildHours():
 // returns nothing (show:false) when the cell should stay empty.
-function dayHours(hasClickUp, isWorkday, logged, target){
-  if (hasClickUp){
-    if (isWorkday){
+function dayHours(hasClickUp, isWorkday, logged, target) {
+  if (hasClickUp) {
+    if (isWorkday) {
       return {
         show: true,
         loggedStr: formatHours(logged),
@@ -15,7 +22,7 @@ function dayHours(hasClickUp, isWorkday, logged, target){
         targetStr: formatHours(target),
       };
     }
-    if (logged > 0){
+    if (logged > 0) {
       return { show: true, loggedStr: formatHours(logged), logClass: "ok", targetStr: "" };
     }
     return { show: false };
@@ -27,7 +34,7 @@ function dayHours(hasClickUp, isWorkday, logged, target){
 
 // Derives the whole month grid (week rows, day cells, running subtotals) and the
 // header stat cards from reactive state, mirroring the original renderMonth().
-export function useMonthView(){
+export function useMonthView() {
   const model = computed(() => {
     const cursor = state.cursor;
     const year = cursor.getFullYear();
@@ -41,15 +48,21 @@ export function useMonthView(){
     const hasClickUp = cuReady();
     const target = hoursPerDay.value;
 
-    let workDays = 0, weekendDays = 0, holidayOnWeekday = 0, loggedTotal = 0, onCallTotal = 0;
+    let workDays = 0;
+    let weekendDays = 0;
+    let holidayOnWeekday = 0;
+    let loggedTotal = 0;
+    let onCallTotal = 0;
     const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
-    let targetToToday = 0, loggedToToday = 0;
-    let runningTarget = 0, runningLogged = 0;
+    let targetToToday = 0;
+    let loggedToToday = 0;
+    let runningTarget = 0;
+    let runningLogged = 0;
 
     const weeks = [];
     let week = null;
 
-    for (let i = 0; i < cellCount; i++){
+    for (let i = 0; i < cellCount; i++) {
       const dayNum = i - leading + 1;
       const date = new Date(year, month, dayNum);
       const inMonth = dayNum >= 1 && dayNum <= total;
@@ -62,7 +75,7 @@ export function useMonthView(){
       const logged = state.entries.get(key) || 0;
       const onCall = state.onCall.get(key) || 0;
 
-      if (i % 7 === 0){
+      if (i % 7 === 0) {
         week = {
           weekNum: isoWeekNumber(date),
           days: [],
@@ -76,12 +89,12 @@ export function useMonthView(){
         };
       }
 
-      if (inMonth){
+      if (inMonth) {
         week.hasInMonth = true;
         week.logged += logged;
         week.onCall += onCall;
         onCallTotal += onCall;
-        if (isWorkday){
+        if (isWorkday) {
           week.workDays++;
           week.target += target;
           workDays++;
@@ -91,7 +104,7 @@ export function useMonthView(){
           holidayOnWeekday++;
         }
         loggedTotal += logged;
-        if (isCurrentMonth && date.getDate() <= today.getDate()){
+        if (isCurrentMonth && date.getDate() <= today.getDate()) {
           if (isWorkday) targetToToday += target;
           loggedToToday += logged;
         }
@@ -111,8 +124,8 @@ export function useMonthView(){
         hours: inMonth ? dayHours(hasClickUp, isWorkday, logged, target) : { show: false },
       });
 
-      if (i % 7 === 6){
-        if (week.hasInMonth){
+      if (i % 7 === 6) {
+        if (week.hasInMonth) {
           runningTarget += week.target;
           runningLogged += week.logged;
           week.runningTarget = runningTarget;
@@ -130,9 +143,10 @@ export function useMonthView(){
     }
 
     const targetTotal = workDays * target;
-    let diffText = "–", diffClass = "";
-    if (hasClickUp){
-      const diff = isCurrentMonth ? (loggedToToday - targetToToday) : (loggedTotal - targetTotal);
+    let diffText = "–";
+    let diffClass = "";
+    if (hasClickUp) {
+      const diff = isCurrentMonth ? loggedToToday - targetToToday : loggedTotal - targetTotal;
       diffText = (diff > 0 ? "+" : "") + formatHours(diff);
       if (Math.abs(diff) < 0.05) diffClass = "zero";
       else if (diff > 0) diffClass = "pos";
@@ -148,7 +162,8 @@ export function useMonthView(){
         workDays,
         targetTotal: formatHours(targetTotal),
         logged: hasClickUp ? formatHours(loggedTotal) : "–",
-        loggedMandays: hasClickUp && loggedTotal > 0 ? `${formatHours(loggedTotal / mandayHours.value)} MD` : "",
+        loggedMandays:
+          hasClickUp && loggedTotal > 0 ? `${formatHours(loggedTotal / mandayHours.value)} MD` : "",
         onCall: hasClickUp ? formatHours(onCallTotal) : "–",
         onCallBonus: hasClickUp ? formatHours(onCallTotal * 0.2) : "",
         diffLabel: isCurrentMonth ? "Diff to today" : "Diff",

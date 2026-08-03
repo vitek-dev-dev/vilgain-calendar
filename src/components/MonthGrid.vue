@@ -15,8 +15,8 @@ const LEGEND = [
   { label: "Today", fill: "#d4a017", border: "#fffdf3" },
 ];
 
-function onCellKeydown(e, date){
-  if (e.key === "Enter" || e.key === " "){
+function onCellKeydown(e, date) {
+  if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
     openDay(date);
   }
@@ -54,13 +54,21 @@ function onCellKeydown(e, date){
         <div v-if="cell.isHoliday" class="dholiday">{{ cell.holidayName }}</div>
 
         <div v-if="cell.hours.show" class="dh">
-          <span v-if="cell.hours.loggedStr" class="dh-log" :class="cell.hours.logClass">{{ cell.hours.loggedStr }}</span>
-          <span v-if="cell.hours.loggedStr && cell.hours.targetStr" class="dh-tgt">/ {{ cell.hours.targetStr }}</span>
+          <span v-if="cell.hours.loggedStr" class="dh-log" :class="cell.hours.logClass">{{
+            cell.hours.loggedStr
+          }}</span>
+          <span v-if="cell.hours.loggedStr && cell.hours.targetStr" class="dh-tgt"
+            >/ {{ cell.hours.targetStr }}</span
+          >
           <span v-else-if="cell.hours.targetStr" class="dh-tgt">{{ cell.hours.targetStr }}</span>
           <span class="dh-unit">h</span>
         </div>
 
-        <div v-if="hasClickUp && cell.onCall > 0" class="doncall" title="On Call (deducted from logged hours)">
+        <div
+          v-if="hasClickUp && cell.onCall > 0"
+          class="doncall"
+          title="On Call (deducted from logged hours)"
+        >
           📞 {{ cell.onCallStr }} h
         </div>
       </div>
@@ -74,7 +82,9 @@ function onCellKeydown(e, date){
           <div class="wt-cum">Σ {{ week.cumLoggedStr }} / {{ week.cumTargetStr }} h</div>
           <div v-if="week.onCall > 0" class="wt-oncall">📞 {{ week.onCallStr }} h</div>
         </template>
-        <div v-else class="wt-main"><span class="wt-rest">{{ week.sumTargetStr }} h</span></div>
+        <div v-else class="wt-main">
+          <span class="wt-rest">{{ week.sumTargetStr }} h</span>
+        </div>
       </div>
     </div>
 

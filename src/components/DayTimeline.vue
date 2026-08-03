@@ -11,22 +11,46 @@ const emit = defineEmits(["log-slot"]);
 
 <template>
   <div>
-    <section class="tiles" :class="[model.stats.onCallShow ? 'cols-6' : 'cols-5', { loading: isLoading && !dayLoaded }]">
+    <section
+      class="tiles"
+      :class="[model.stats.onCallShow ? 'cols-6' : 'cols-5', { loading: isLoading && !dayLoaded }]"
+    >
       <div class="tile">
         <div class="label">Logged</div>
         <div class="value" :class="{ 'has-note': model.stats.loggedMandays }">
           {{ model.stats.logged }}
-          <span v-if="model.stats.loggedMandays" class="value-note">({{ model.stats.loggedMandays }})</span>
+          <span v-if="model.stats.loggedMandays" class="value-note"
+            >({{ model.stats.loggedMandays }})</span
+          >
         </div>
       </div>
-      <div class="tile"><div class="label">Target</div><div class="value">{{ model.stats.goal }}</div></div>
-      <div class="tile"><div class="label">Remaining</div><div class="value green">{{ model.stats.remaining }}</div></div>
-      <div class="tile"><div class="label">Diff</div><div class="value" :class="model.stats.diffClass">{{ model.stats.diffText }}</div></div>
-      <div class="tile"><div class="label">Records</div><div class="value accent">{{ model.stats.count }}</div></div>
-      <div v-if="model.stats.onCallShow" class="tile"><div class="label">On call</div><div class="value oncall">{{ model.stats.onCall }}</div></div>
+      <div class="tile">
+        <div class="label">Target</div>
+        <div class="value">{{ model.stats.goal }}</div>
+      </div>
+      <div class="tile">
+        <div class="label">Remaining</div>
+        <div class="value green">{{ model.stats.remaining }}</div>
+      </div>
+      <div class="tile">
+        <div class="label">Diff</div>
+        <div class="value" :class="model.stats.diffClass">{{ model.stats.diffText }}</div>
+      </div>
+      <div class="tile">
+        <div class="label">Records</div>
+        <div class="value accent">{{ model.stats.count }}</div>
+      </div>
+      <div v-if="model.stats.onCallShow" class="tile">
+        <div class="label">On call</div>
+        <div class="value oncall">{{ model.stats.onCall }}</div>
+      </div>
     </section>
 
-    <section class="panel day-panel" :class="{ loading: isLoading && !dayLoaded }" aria-label="Day timeline">
+    <section
+      class="panel day-panel"
+      :class="{ loading: isLoading && !dayLoaded }"
+      aria-label="Day timeline"
+    >
       <div class="day-badge-row">
         <span class="day-badge" :class="model.badge.cls">{{ model.badge.label }}</span>
       </div>
@@ -49,7 +73,12 @@ const emit = defineEmits(["log-slot"]);
           type="button"
           class="tl-free"
           :class="{ short: slot.short }"
-          :style="{ top: slot.top + 'px', height: slot.height + 'px', left: slot.left, width: slot.width }"
+          :style="{
+            top: slot.top + 'px',
+            height: slot.height + 'px',
+            left: slot.left,
+            width: slot.width,
+          }"
           :title="slot.tooltip"
           @click="emit('log-slot', { start: slot.start, end: slot.end })"
         >
@@ -67,14 +96,23 @@ const emit = defineEmits(["log-slot"]);
           :href="block.href || null"
           :target="block.href ? '_blank' : null"
           :rel="block.href ? 'noopener noreferrer' : null"
-          :style="{ top: block.top + 'px', height: block.height + 'px', left: block.left, width: block.width }"
+          :style="{
+            top: block.top + 'px',
+            height: block.height + 'px',
+            left: block.left,
+            width: block.width,
+          }"
           :title="block.tooltip"
         >
           <div class="tb-title">{{ block.titleText }}</div>
           <div v-if="block.showMeta" class="tb-meta">{{ block.metaText }}</div>
         </component>
 
-        <div v-if="model.timeline.nowLine" class="tl-now" :style="{ top: model.timeline.nowLine.top + 'px' }">
+        <div
+          v-if="model.timeline.nowLine"
+          class="tl-now"
+          :style="{ top: model.timeline.nowLine.top + 'px' }"
+        >
           <span class="now-label">{{ model.timeline.nowLine.label }}</span>
         </div>
       </div>

@@ -17,7 +17,7 @@ const pools = new Map();
 // the Log time header; empty until a pool load has populated listMeta.
 export const currentSprint = ref("");
 
-export function clearTaskPools(){
+export function clearTaskPools() {
   pools.clear();
   listMeta.clear();
   folderLoaded.clear();
@@ -39,7 +39,7 @@ export function clearTaskPools(){
 const listMeta = new Map();
 const folderLoaded = new Set();
 
-function toMeta(l){
+function toMeta(l) {
   return {
     id: String(l.id),
     name: l.name || "",
@@ -51,13 +51,13 @@ function toMeta(l){
   };
 }
 
-async function ensureSprintFolder(){
+async function ensureSprintFolder() {
   const folderId = String(state.config.sprintFolderId || "");
   if (!folderId || folderLoaded.has(folderId)) return;
   folderLoaded.add(folderId);
   try {
     const json = await cuFetch(`/folder/${encodeURIComponent(folderId)}/list`);
-    for (const l of json.lists || []){
+    for (const l of json.lists || []) {
       const meta = toMeta(l);
       listMeta.set(meta.id, meta);
     }
@@ -68,13 +68,13 @@ async function ensureSprintFolder(){
 
 // Fold the resolved list metadata onto the task, so everything downstream can
 // keep reading a plain `task.sprint`.
-function stampSprint(task, now){
+function stampSprint(task, now) {
   const metas = task.locations
     .map(l => listMeta.get(l.id))
     .filter(m => m && m.isSprint)
     .sort((a, b) => a.start - b.start);
 
-  if (!metas.length){
+  if (!metas.length) {
     // Not in any sprint — fall back to the folder, flagged so the UI doesn't
     // present a folder name as though it were a sprint.
     task.sprints = [];
@@ -92,21 +92,21 @@ function stampSprint(task, now){
   task.sprintIsCurrent = !!current;
 }
 
-function currentSprintMeta(now){
+function currentSprintMeta(now) {
   let best = null;
-  for (const m of listMeta.values()){
+  for (const m of listMeta.values()) {
     if (!m.isSprint || !m.start || !m.due || now < m.start || now >= m.due) continue;
     if (!best || m.start > best.start) best = m;
   }
   return best;
 }
 
-function refreshCurrentSprint(now){
+function refreshCurrentSprint(now) {
   const best = currentSprintMeta(now);
   currentSprint.value = best ? best.name : "";
 }
 
-async function applySprints(tasks){
+async function applySprints(tasks) {
   await ensureSprintFolder();
   const now = Date.now();
   for (const t of tasks) stampSprint(t, now);
@@ -117,7 +117,7 @@ async function applySprints(tasks){
 // Normalized shape the finder UI consumes. Richer than the Tasks view's
 // normalizer: it keeps the custom id, the folder/list breadcrumb and the sprint,
 // all of which people search by.
-function normalize(t){
+function normalize(t) {
   const status = t.status || {};
   const folder = t.folder && !t.folder.hidden ? t.folder.name : "";
   return {
@@ -128,7 +128,9 @@ function normalize(t){
     statusColor: status.color || "#94a3b8",
     list: (t.list && t.list.name) || "",
     folder,
-    locations: (t.locations || []).filter(l => l && l.id).map(l => ({ id: l.id, name: l.name || "" })),
+    locations: (t.locations || [])
+      .filter(l => l && l.id)
+      .map(l => ({ id: l.id, name: l.name || "" })),
     dateUpdated: Number(t.date_updated) || 0,
     // Filled in by applySprints() once the location lists have been resolved.
     sprint: "",
@@ -140,12 +142,12 @@ function normalize(t){
   };
 }
 
-async function fetchPool({ includeClosed }){
+async function fetchPool({ includeClosed }) {
   const assignee = await cuMyUserId();
   if (!assignee) throw new Error("Couldn't identify your ClickUp account.");
   const tasks = [];
   let truncated = false;
-  for (let page = 0; page < MAX_PAGES; page++){
+  for (let page = 0; page < MAX_PAGES; page++) {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("include_closed", includeClosed ? "true" : "false");
@@ -173,19 +175,19 @@ async function fetchPool({ includeClosed }){
 // else, so scoping this by assignee would miss exactly the ones wanted. Filtering
 // happens at render rather than here, so editing the patterns takes effect
 // without a refetch.
-async function fetchCurrentSprintTasks(excludeIds, includeClosed){
+async function fetchCurrentSprintTasks(excludeIds, includeClosed) {
   const sprint = currentSprintMeta(Date.now());
   if (!sprint) return [];
   const out = [];
   try {
-    for (let page = 0; page < 5; page++){
+    for (let page = 0; page < 5; page++) {
       const params = new URLSearchParams();
       params.set("page", String(page));
       params.set("include_closed", includeClosed ? "true" : "false");
       params.set("subtasks", "true");
       const json = await cuFetch(`/list/${encodeURIComponent(sprint.id)}/task`, params);
       const list = json.tasks || [];
-      for (const t of list){
+      for (const t of list) {
         if (excludeIds.has(t.id)) continue;
         out.push(normalize(t));
       }
@@ -205,7 +207,7 @@ async function fetchCurrentSprintTasks(excludeIds, includeClosed){
 // digit and a letter to be taken for an id, so "standup" stays a search.
 const CUSTOM_ID_RE = /^[A-Za-z][A-Za-z0-9]*-\d+$/;
 
-export function parseTaskRef(text){
+export function parseTaskRef(text) {
   const s = String(text || "").trim();
   if (!s || /\s/.test(s)) return null;
 
@@ -220,7 +222,7 @@ export function parseTaskRef(text){
   return looksLikeId ? { id: token, custom: false, fromUrl } : null;
 }
 
-export async function cuGetTask(taskRef){
+export async function cuGetTask(taskRef) {
   const params = taskRef.custom
     ? { custom_task_ids: "true", team_id: String(state.config.teamId || "") }
     : undefined;
@@ -236,16 +238,19 @@ export async function cuGetTask(taskRef){
 // Returns [{ task, rank }] for everything matching, rank 0 when there is no
 // query. Ordering is left to sortHits() so the chosen sort mode can decide how
 // much weight relevance carries.
-export function searchTasks(tasks, query){
-  const q = String(query || "").trim().toLowerCase();
+export function searchTasks(tasks, query) {
+  const q = String(query || "")
+    .trim()
+    .toLowerCase();
   if (!q) return tasks.map(task => ({ task, rank: 0 }));
   const terms = q.split(/\s+/);
   const hits = [];
-  for (const t of tasks){
+  for (const t of tasks) {
     const title = t.title.toLowerCase();
     // Every list the task sits in, so an older sprint still finds it.
     const places = t.locations.map(l => l.name).join(" ");
-    const hay = `${title} ${t.customId} ${places} ${t.list} ${t.folder} ${t.statusName}`.toLowerCase();
+    const hay =
+      `${title} ${t.customId} ${places} ${t.list} ${t.folder} ${t.statusName}`.toLowerCase();
     if (!terms.every(term => hay.includes(term))) continue;
     const i = title.indexOf(terms[0]);
     const rank = i === 0 ? 0 : i > 0 ? (/[\s\-_/[\]]/.test(title[i - 1]) ? 1 : 2) : 3;
@@ -265,20 +270,24 @@ export const SORT_MODES = [
 // title, pinning matches to the top of the Default sort.
 const prioReCache = new Map();
 
-function prioRegex(pattern){
+function prioRegex(pattern) {
   if (prioReCache.has(pattern)) return prioReCache.get(pattern);
   let re = null;
-  try { re = new RegExp(pattern, "i"); } catch { re = null; }
+  try {
+    re = new RegExp(pattern, "i");
+  } catch {
+    re = null;
+  }
   prioReCache.set(pattern, re);
   return re;
 }
 
-export function isValidPriorityPattern(pattern){
+export function isValidPriorityPattern(pattern) {
   const p = String(pattern ?? "").trim();
   return !p || !!prioRegex(p);
 }
 
-export function isPriorityTask(task){
+export function isPriorityTask(task) {
   const title = task && task.title;
   if (!title) return false;
   return (state.config.priorityTasks || []).some(p => {
@@ -291,43 +300,45 @@ export function isPriorityTask(task){
 
 // Sprint ordering: the sprint running today first, then the most recent sprints,
 // then tasks in no sprint at all. Descending, so a bigger key sorts earlier.
-function sprintKey(t){
+function sprintKey(t) {
   if (t.sprintIsCurrent) return Number.MAX_SAFE_INTEGER;
   if (t.sprintIsFolder || !t.sprintStart) return -1;
   return t.sprintStart;
 }
 
-function bySprintThenName(a, b){
+function bySprintThenName(a, b) {
   const d = sprintKey(b.task) - sprintKey(a.task);
   if (d) return d;
   return a.task.title.localeCompare(b.task.title);
 }
 
-function statOf(hit, stats){
+function statOf(hit, stats) {
   return (stats && stats.get(hit.task.id)) || { hours: 0, last: 0 };
 }
 
-export function sortHits(hits, { mode, stats, hasQuery }){
+export function sortHits(hits, { mode, stats, hasQuery }) {
   const out = hits.slice();
-  if (mode === "worked"){
-    out.sort((a, b) => (statOf(b, stats).hours - statOf(a, stats).hours) || bySprintThenName(a, b));
-  } else if (mode === "recent"){
-    out.sort((a, b) => (statOf(b, stats).last - statOf(a, stats).last) || bySprintThenName(a, b));
-  } else if (mode === "updated"){
+  if (mode === "worked") {
+    out.sort((a, b) => statOf(b, stats).hours - statOf(a, stats).hours || bySprintThenName(a, b));
+  } else if (mode === "recent") {
+    out.sort((a, b) => statOf(b, stats).last - statOf(a, stats).last || bySprintThenName(a, b));
+  } else if (mode === "updated") {
     // Straight off the task's own date_updated — no time entries involved.
-    out.sort((a, b) => (b.task.dateUpdated - a.task.dateUpdated) || bySprintThenName(a, b));
+    out.sort((a, b) => b.task.dateUpdated - a.task.dateUpdated || bySprintThenName(a, b));
   } else {
     // Default: pinned tasks first, then relevance while searching, then sprint
     // and name.
-    out.sort((a, b) =>
-      (isPriorityTask(a.task) ? 0 : 1) - (isPriorityTask(b.task) ? 0 : 1)
-      || (hasQuery ? a.rank - b.rank : 0)
-      || bySprintThenName(a, b));
+    out.sort(
+      (a, b) =>
+        (isPriorityTask(a.task) ? 0 : 1) - (isPriorityTask(b.task) ? 0 : 1) ||
+        (hasQuery ? a.rank - b.rank : 0) ||
+        bySprintThenName(a, b),
+    );
   }
   return out;
 }
 
-function poolKey(includeClosed){
+function poolKey(includeClosed) {
   return `${state.config.teamId}|${includeClosed ? "closed" : "open"}`;
 }
 
@@ -335,10 +346,13 @@ function poolKey(includeClosed){
 // moments later join the same request instead of racing two identical sweeps.
 const inflight = new Map();
 
-function fetchPoolOnce(key, includeClosed){
+function fetchPoolOnce(key, includeClosed) {
   if (inflight.has(key)) return inflight.get(key);
   const p = fetchPool({ includeClosed })
-    .then(pool => { pools.set(key, pool); return pool; })
+    .then(pool => {
+      pools.set(key, pool);
+      return pool;
+    })
     .finally(() => inflight.delete(key));
   inflight.set(key, p);
   return p;
@@ -347,14 +361,14 @@ function fetchPoolOnce(key, includeClosed){
 // Warm the cache on boot so the Log time drawer opens against a populated list
 // instead of a spinner. Failures are swallowed — nothing is on screen to report
 // them against, and opening the drawer will retry and surface them properly.
-export function prewarmTaskPool({ includeClosed = false } = {}){
+export function prewarmTaskPool({ includeClosed = false } = {}) {
   if (!cuReady()) return;
   const key = poolKey(includeClosed);
   if (pools.has(key) || inflight.has(key)) return;
   fetchPoolOnce(key, includeClosed).catch(() => {});
 }
 
-export function useTaskFinder(){
+export function useTaskFinder() {
   // `loading` blocks the list (nothing to show yet); `refreshing` is a silent
   // revalidation behind data that is already on screen.
   const loading = ref(false);
@@ -366,14 +380,14 @@ export function useTaskFinder(){
   const sprintTasks = ref([]);
   const truncated = ref(false);
 
-  function apply(pool){
+  function apply(pool) {
     tasks.value = pool.tasks;
     sprintTasks.value = pool.sprintTasks || [];
     truncated.value = pool.truncated;
   }
 
-  async function load({ includeClosed, force = false }){
-    if (!cuReady()){
+  async function load({ includeClosed, force = false }) {
+    if (!cuReady()) {
       tasks.value = [];
       sprintTasks.value = [];
       error.value = "Connect ClickUp in settings (⚙) first.";
@@ -382,7 +396,7 @@ export function useTaskFinder(){
     const key = poolKey(includeClosed);
     const cached = pools.get(key);
     // Show what we already have immediately, then decide whether to revalidate.
-    if (cached){
+    if (cached) {
       apply(cached);
       error.value = "";
       if (!force) return;
@@ -396,8 +410,8 @@ export function useTaskFinder(){
     error.value = "";
     try {
       apply(await fetchPoolOnce(key, includeClosed));
-    } catch (err){
-      if (!silent){
+    } catch (err) {
+      if (!silent) {
         error.value = err.message;
         tasks.value = [];
         sprintTasks.value = [];
