@@ -242,7 +242,7 @@ function breadcrumb(t) {
         </button>
       </div>
       <label class="finder-check">
-        <input type="checkbox" v-model="includeClosed" />
+        <input v-model="includeClosed" type="checkbox" />
         Include closed
       </label>
       <button

@@ -13,7 +13,9 @@ const onCallReCache = new Map();
 
 function onCallRegex(pattern) {
   if (onCallReCache.has(pattern)) return onCallReCache.get(pattern);
-  let re = null;
+  // Left undeclared-empty rather than seeded with null: both branches below assign
+  // it, so an initializer would be dead.
+  let re;
   try {
     re = new RegExp(pattern, "i");
   } catch {

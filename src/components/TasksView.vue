@@ -4,7 +4,7 @@ import { cuReady } from "../composables/useClickUp.js";
 
 // Renders ClickUp tasks grouped by status. Each group:
 // { name, dotColor, tasks: [{ title, priority, list, url, trackedStr, estimateStr, over }] }.
-const props = defineProps({
+defineProps({
   groups: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
 });

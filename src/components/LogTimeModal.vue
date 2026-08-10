@@ -79,7 +79,7 @@ function toMinutes(hhmm) {
 
 const durationMinutes = computed(() => {
   if (!start.value || !end.value) return 0;
-  let s = toMinutes(start.value);
+  const s = toMinutes(start.value);
   let e = toMinutes(end.value);
   if (e <= s) e += 24 * 60; // overnight
   return e - s;
