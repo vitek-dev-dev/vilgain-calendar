@@ -94,6 +94,7 @@ a.view-title-link .ext-ico{font-size:12px;opacity:.7}
 
 /* ---------- Stat tiles ---------- */
 .tiles{display:grid;gap:14px;margin-bottom:18px}
+.tiles.cols-7{grid-template-columns:repeat(7,1fr)}
 .tiles.cols-6{grid-template-columns:repeat(6,1fr)}
 .tiles.cols-5{grid-template-columns:repeat(5,1fr)}
 .tile{
@@ -108,7 +109,7 @@ a.view-title-link .ext-ico{font-size:12px;opacity:.7}
   font-weight:700;font-size:26px;margin-top:6px;
   font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.1;
 }
-.tiles.cols-5 .tile .value,.tiles.cols-6 .tile .value{font-size:24px}
+.tiles.cols-5 .tile .value,.tiles.cols-6 .tile .value,.tiles.cols-7 .tile .value{font-size:24px}
 .tile .value.accent{color:var(--accent)}
 .tile .value.green,.tile .value.pos{color:var(--green)}
 .tile .value.red,.tile .value.neg{color:var(--red)}
@@ -118,6 +119,24 @@ a.view-title-link .ext-ico{font-size:12px;opacity:.7}
 .tile .value.has-note{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
 .tile .value .value-note{font-size:0.5em;color:var(--muted);margin-left:auto}
 .tile .value.zero{color:var(--muted)}
+/* A tile whose figure is typed in rather than derived — the month's holiday
+   hours. Sized like .value so the row of tiles keeps one baseline. */
+.tile-input{
+  display:flex;align-items:baseline;gap:4px;margin-top:6px;
+  border-bottom:1px dashed rgba(15,23,42,.18);cursor:text;
+}
+.tile-input:focus-within{border-bottom-color:var(--accent)}
+.tile-input input{
+  width:100%;min-width:0;padding:0;border:none;background:none;outline:none;
+  font:700 24px system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.1;
+}
+.tile-input input::placeholder{color:var(--disabled)}
+/* The spinners would eat the width a four-digit figure needs. */
+.tile-input input::-webkit-outer-spin-button,
+.tile-input input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.tile-input input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.tile-input-unit{font-weight:700;font-size:13px;color:var(--faint)}
 /* Loading shimmer */
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .tiles.loading .tile .value{
@@ -848,8 +867,12 @@ a.pr-card{text-decoration:none;color:inherit}
 }
 
 /* ---------- Responsive ---------- */
+/* Seven tiles run out of room before six do. */
+@media (max-width:1150px){
+  .tiles.cols-7{grid-template-columns:repeat(4,1fr)}
+}
 @media (max-width:900px){
-  .tiles.cols-6,.tiles.cols-5{grid-template-columns:repeat(3,1fr)}
+  .tiles.cols-7,.tiles.cols-6,.tiles.cols-5{grid-template-columns:repeat(3,1fr)}
 }
 /* Full-bleed drawer once it covers the whole width. */
 @media (max-width:660px){
@@ -860,7 +883,7 @@ a.pr-card{text-decoration:none;color:inherit}
 }
 @media (max-width:640px){
   .app{padding:8px 14px 32px}
-  .tiles.cols-6,.tiles.cols-5{grid-template-columns:repeat(2,1fr)}
+  .tiles.cols-7,.tiles.cols-6,.tiles.cols-5{grid-template-columns:repeat(2,1fr)}
   .cal-row{grid-template-columns:34px repeat(7,1fr) 96px;gap:4px}
   .daycell{min-height:88px;padding:8px}
   .dh .dh-log{font-size:15px}

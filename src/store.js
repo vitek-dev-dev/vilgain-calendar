@@ -19,12 +19,18 @@ export function loadConfig() {
     taskSort: "default",
     githubToken: "",
     githubOrg: "",
+    holidayHours: {}, // "YYYY-MM" -> hours of holiday taken that month
   };
   try {
     const parsed = JSON.parse(localStorage.getItem(LS_KEY)) || {};
     // Legacy: the assignee used to be selectable. Everything is scoped to the
     // token owner now, so a stored value is dropped rather than re-persisted.
     delete parsed.assigneeId;
+    // A malformed holiday map would break the spread below, so it falls back to
+    // the empty default rather than reaching the rest of the app.
+    if (!parsed.holidayHours || typeof parsed.holidayHours !== "object") {
+      delete parsed.holidayHours;
+    }
     return { ...defaults, ...parsed };
   } catch {
     return { ...defaults };
@@ -107,6 +113,28 @@ export const hoursPerDay = computed(() => positiveHours(state.config.hoursPerDay
 // separate from the daily target: the target is what you aim to log, a manday is
 // the unit work is estimated in.
 export const mandayHours = computed(() => positiveHours(state.config.mandayHours, 8));
+
+// Holiday (paid time off) is entered by hand per month: ClickUp has no record of
+// it, so without it every month with a holiday in it would keep a permanent
+// shortfall in the diff. The hours are subtracted from that month's target.
+const HOLIDAY_MAX = 744; // hours in the longest possible month
+
+export function monthHolidayHours(key) {
+  const n = Number(state.config.holidayHours?.[key]);
+  return Number.isFinite(n) && n > 0 ? Math.min(HOLIDAY_MAX, n) : 0;
+}
+
+export function setMonthHolidayHours(key, hours) {
+  const n = Number(hours);
+  const clean = Number.isFinite(n) && n > 0 ? Math.min(HOLIDAY_MAX, Math.round(n * 100) / 100) : 0;
+  // Replaced rather than mutated so the reactive read in the month view is
+  // tracked; an emptied month drops out of storage instead of persisting a 0.
+  const next = { ...state.config.holidayHours };
+  if (clean > 0) next[key] = clean;
+  else delete next[key];
+  state.config.holidayHours = next;
+  saveConfig();
+}
 
 // The configured working-hours window, normalized to whole hours with
 // start < end. Both the settings UI and the day timeline read this so a

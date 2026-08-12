@@ -1,11 +1,12 @@
 import { computed } from "vue";
-import { state, hoursPerDay, mandayHours } from "../store.js";
+import { state, hoursPerDay, mandayHours, monthHolidayHours } from "../store.js";
 import {
   mondayIndex,
   isoWeekNumber,
   iso,
   sameDay,
   daysInMonth,
+  monthKey,
   formatHours,
 } from "../utils/date.js";
 import { cuReady } from "./useClickUp.js";
@@ -47,6 +48,10 @@ export function useMonthView() {
     const today = new Date();
     const hasClickUp = cuReady();
     const target = hoursPerDay.value;
+    // Holiday is a single figure for the month, not attributable to any one day,
+    // so it lands on the month totals only — the week rows keep their gross
+    // target.
+    const holiday = monthHolidayHours(monthKey(cursor));
 
     let workDays = 0;
     let weekendDays = 0;
@@ -142,11 +147,17 @@ export function useMonthView() {
       }
     }
 
-    const targetTotal = workDays * target;
+    // The target before holiday is taken off, kept so the tile can show what the
+    // month would have asked for.
+    const grossTarget = workDays * target;
+    const targetTotal = Math.max(0, grossTarget - holiday);
+    // Holiday already taken sits in the past, so it comes off the to-today
+    // target as well — otherwise the running diff stays negative all month.
+    const netTargetToToday = Math.max(0, targetToToday - holiday);
     let diffText = "–";
     let diffClass = "";
     if (hasClickUp) {
-      const diff = isCurrentMonth ? loggedToToday - targetToToday : loggedTotal - targetTotal;
+      const diff = isCurrentMonth ? loggedToToday - netTargetToToday : loggedTotal - targetTotal;
       diffText = (diff > 0 ? "+" : "") + formatHours(diff);
       if (Math.abs(diff) < 0.05) diffClass = "zero";
       else if (diff > 0) diffClass = "pos";
@@ -161,6 +172,7 @@ export function useMonthView() {
         holidayOnWeekday,
         workDays,
         targetTotal: formatHours(targetTotal),
+        targetGross: holiday > 0 ? formatHours(grossTarget) : "",
         logged: hasClickUp ? formatHours(loggedTotal) : "–",
         loggedMandays:
           hasClickUp && loggedTotal > 0 ? `${formatHours(loggedTotal / mandayHours.value)} MD` : "",
