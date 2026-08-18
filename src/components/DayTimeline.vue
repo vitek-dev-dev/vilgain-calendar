@@ -1,11 +1,15 @@
 <script setup>
 import { isLoading, dayLoaded } from "../store.js";
+import { QUICK_LOG_TEMPLATES } from "../constants.js";
+import { PINNED_MODE } from "../composables/useTaskFinder.js";
 
 defineProps({
   model: { type: Object, required: true },
 });
 // A free slot is an invitation to log against it — the parent opens the Log time
-// drawer prefilled with the slot's range.
+// drawer prefilled with the slot's range. Quick-log templates reuse the same
+// event: a fixed range with no slot behind it, opened on the Pinned tab because
+// a ceremony is logged against a recurring task rather than a searched-for one.
 const emit = defineEmits(["log-slot"]);
 </script>
 
@@ -52,6 +56,19 @@ const emit = defineEmits(["log-slot"]);
       aria-label="Day timeline"
     >
       <div class="day-badge-row">
+        <div v-if="model.canLog" class="quick-log">
+          <button
+            v-for="t in QUICK_LOG_TEMPLATES"
+            :key="t.label"
+            type="button"
+            class="ql-chip"
+            :title="`Log ${t.start}–${t.end} for ${t.label} — pick the task in the drawer`"
+            @click="emit('log-slot', { start: t.start, end: t.end, sort: PINNED_MODE })"
+          >
+            {{ t.label }}
+            <span class="ql-time">{{ t.start }}–{{ t.end }}</span>
+          </button>
+        </div>
         <span class="day-badge" :class="model.badge.cls">{{ model.badge.label }}</span>
       </div>
 

@@ -15,7 +15,8 @@ import { currentSprint } from "../composables/useTaskFinder.js";
 const props = defineProps({
   open: { type: Boolean, default: false },
   // Seed values applied each time the overlay opens. All optional:
-  // { dateIso, start, end, task }
+  // { dateIso, start, end, task, sort } — `sort` picks the finder's tab for this
+  // open, so a caller that knows the kind of task it wants can say so.
   preset: { type: Object, default: () => ({}) },
 });
 const emit = defineEmits(["close"]);
@@ -143,7 +144,12 @@ async function save() {
       </button>
     </header>
 
-    <TaskFinderPanel :active="open" :selected-id="task ? task.id : ''" @select="task = $event" />
+    <TaskFinderPanel
+      :active="open"
+      :selected-id="task ? task.id : ''"
+      :force-sort="preset.sort || ''"
+      @select="task = $event"
+    />
 
     <div class="lt-when-body">
       <!-- No empty state: with the list directly above, an unfilled slot here

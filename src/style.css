@@ -229,7 +229,21 @@ a.view-title-link .ext-ico{font-size:12px;opacity:.7}
 
 /* ---------- Day view ---------- */
 .day-panel{padding:22px 26px 26px}
-.day-badge-row{display:flex;justify-content:flex-end;margin-bottom:14px}
+.day-badge-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:22px}
+/* Quick log sits opposite the badge; margin-auto rather than space-between so the
+   badge stays right when the row is withheld. */
+.quick-log{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-right:auto}
+.ql-chip{
+  display:flex;align-items:baseline;gap:7px;cursor:pointer;
+  padding:5px 12px;border-radius:999px;
+  background:var(--card);border:1.5px dashed rgba(15,23,42,.16);
+  font:700 13px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);
+  transition:border-color .12s ease,background-color .12s ease,color .12s ease;
+}
+.ql-chip:hover{border-color:var(--accent);background:rgba(109,93,240,.05);color:var(--accent)}
+.ql-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ql-chip .ql-time{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.ql-chip:hover .ql-time{color:var(--accent)}
 .day-badge{font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;padding:5px 12px;border-radius:999px}
 .day-badge.work{color:var(--green);background:var(--cell-work);border:1px solid #bbf7d0}
 .day-badge.weekend{color:var(--muted);background:var(--cell-weekend);border:1px solid #e2e8f0}

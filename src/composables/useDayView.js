@@ -163,6 +163,9 @@ export function useDayView() {
       return {
         badge,
         stats,
+        // Nothing to log against without a connection, so the quick-log row is
+        // withheld rather than shown leading to a drawer that can't save.
+        canLog: false,
         empty: "Connect ClickUp in settings (⚙) to see this day's time entries.",
         timeline: null,
       };
@@ -203,7 +206,13 @@ export function useDayView() {
     }
 
     if (entries.length === 0 && freeSlots.length === 0) {
-      return { badge, stats, empty: "No time entries logged for this day yet.", timeline: null };
+      return {
+        badge,
+        stats,
+        canLog: true,
+        empty: "No time entries logged for this day yet.",
+        timeline: null,
+      };
     }
 
     let minH = work.start;
@@ -317,6 +326,7 @@ export function useDayView() {
     return {
       badge,
       stats,
+      canLog: true,
       empty: null,
       timeline: { hours, blocks, placeholders, nowLine, height },
     };

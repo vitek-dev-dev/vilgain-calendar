@@ -8,6 +8,7 @@ import {
   sortHits,
   isPriorityTask,
   SORT_MODES,
+  PINNED_MODE,
   parseTaskRef,
   cuGetTask,
 } from "../composables/useTaskFinder.js";
@@ -22,6 +23,10 @@ const props = defineProps({
   active: { type: Boolean, default: false },
   selectedId: { type: String, default: "" },
   autofocus: { type: Boolean, default: true },
+  // Tab to open on, for hosts that know which one fits how they were launched
+  // (quick-log always wants Pinned). Applied per open and deliberately not
+  // persisted — it belongs to the entry point, not to the user's preference.
+  forceSort: { type: String, default: "" },
 });
 const emit = defineEmits(["select"]);
 
@@ -75,14 +80,20 @@ function setSort(key) {
 const RESULT_LIMIT = 80;
 
 // Priority tasks from the current sprint that aren't assigned to you. Default
-// only — the other sorts are about your own history, which these have none of.
-// Filtered here rather than at fetch so editing the patterns applies at once.
+// and Pinned only — the other sorts are about your own history, which these have
+// none of. Filtered here rather than at fetch so editing the patterns applies at
+// once.
 const extraTasks = computed(() =>
-  sortMode.value === "default" ? sprintTasks.value.filter(isPriorityTask) : [],
+  sortMode.value === "default" || sortMode.value === PINNED_MODE
+    ? sprintTasks.value.filter(isPriorityTask)
+    : [],
 );
 
 const results = computed(() => {
-  const pool = extraTasks.value.length ? [...extraTasks.value, ...tasks.value] : tasks.value;
+  const all = extraTasks.value.length ? [...extraTasks.value, ...tasks.value] : tasks.value;
+  // Pinned narrows the same pool to the priority patterns instead of reordering
+  // it: the recurring tasks time gets logged against, with nothing else in the way.
+  const pool = sortMode.value === PINNED_MODE ? all.filter(isPriorityTask) : all;
   const hits = searchTasks(pool, query.value);
   const sorted = sortHits(hits, {
     mode: sortMode.value,
@@ -126,6 +137,9 @@ watch(
     activeIndex.value = 0;
     resolved.value = null;
     resolveError.value = "";
+    if (props.forceSort && SORT_MODES.some(m => m.key === props.forceSort)) {
+      sortMode.value = props.forceSort;
+    }
     // Revalidate on every open: the cached list shows at once and is replaced when
     // the fresh one lands.
     load({ includeClosed: includeClosed.value, force: true });
@@ -329,6 +343,9 @@ function breadcrumb(t) {
         class="finder-msg"
       >
         <template v-if="query">No task matches “{{ query }}”.</template>
+        <template v-else-if="sortMode === PINNED_MODE">
+          No pinned tasks — add priority task patterns in settings (⚙).
+        </template>
         <template v-else>No tasks in this workspace.</template>
       </div>
     </div>

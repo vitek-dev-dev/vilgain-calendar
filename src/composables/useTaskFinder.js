@@ -259,8 +259,14 @@ export function searchTasks(tasks, query) {
   return hits;
 }
 
+// The tabs above the result list. "pinned" is the odd one out — a filter rather
+// than an ordering (see PINNED_MODE in TaskFinderPanel); it falls through to the
+// default ordering below, which is what you want once the list is all pins.
+export const PINNED_MODE = "pinned";
+
 export const SORT_MODES = [
   { key: "default", label: "Default" },
+  { key: PINNED_MODE, label: "Pinned" },
   { key: "worked", label: "Most worked on" },
   { key: "recent", label: "Last worked on" },
   { key: "updated", label: "Last updated" },

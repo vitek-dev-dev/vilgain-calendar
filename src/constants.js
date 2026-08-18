@@ -29,3 +29,14 @@ export const VIEW_LS_KEY = "calendar.view.v1";
 export const VIEWS = ["month", "day", "tasks", "prs"];
 // Timeline scale: one hour = 64px (design token).
 export const PX_PER_HOUR = 64;
+
+// Recurring ceremonies that always land on the same clock window. They open the
+// Log time drawer prefilled with the range so only the task is left to pick —
+// the times are fixed by the meeting, not by configuration. Kept in start order
+// so the row reads as the shape of the day.
+export const QUICK_LOG_TEMPLATES = [
+  { label: "Standup", start: "09:30", end: "10:00" },
+  { label: "TechTalks", start: "12:00", end: "13:00" },
+  { label: "Refinement", start: "13:30", end: "14:00" },
+  { label: "Planning", start: "14:30", end: "15:30" },
+];

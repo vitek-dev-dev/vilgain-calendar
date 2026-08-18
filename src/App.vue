@@ -44,8 +44,9 @@ function openLogTime(preset) {
 }
 
 // A free slot on the day timeline logs against that exact window on that day.
-function onLogSlot({ start, end }) {
-  openLogTime({ dateIso: iso(state.dayCursor), start, end });
+// `sort` is set only by the quick-log templates, which land on the Pinned tab.
+function onLogSlot({ start, end, sort }) {
+  openLogTime({ dateIso: iso(state.dayCursor), start, end, sort });
 }
 
 function onKeydown(e) {
