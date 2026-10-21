@@ -20,6 +20,7 @@ import {
   clearTaskStats,
   isValidOnCallPattern,
 } from "../composables/useClickUp.js";
+import { DEFAULT_CR_FIELD_NAME, DEFAULT_REVIEW_STATUSES } from "../constants.js";
 import { isValidPriorityPattern, clearTaskPools } from "../composables/useTaskFinder.js";
 import { titleCase, statusRanks, statusOrderComparator } from "../composables/useTasksView.js";
 import { ghReady, ghLoadAccount, ghLoadPRs } from "../composables/useGitHub.js";
@@ -42,6 +43,8 @@ const ghTokenInput = ref("");
 const ghOrgInput = ref("");
 const onCallRows = ref([]);
 const priorityRows = ref([]);
+const crFieldInput = ref("");
+const reviewStatusRows = ref([]);
 const tokenEl = ref(null);
 const cuTeamsLoading = ref(false);
 const ghAccountLoading = ref(false);
@@ -116,6 +119,8 @@ watch(
     ghOrgInput.value = state.config.githubOrg || "";
     onCallRows.value = [...(state.config.onCallTasks || [])];
     priorityRows.value = [...(state.config.priorityTasks || [])];
+    crFieldInput.value = state.config.crFieldName || "";
+    reviewStatusRows.value = [...(state.config.reviewStatuses || [])];
     // Guarded so reopening the dialog doesn't refetch what we already have, or fire
     // a second request while the first is still in flight. The workspace list is
     // gated on the token alone, not cuReady(), so it also loads in the state where
@@ -365,6 +370,32 @@ function removePriority(i) {
   persistPriority();
 }
 
+// The CR field name and the review statuses define the Code reviews queue
+// outright, so each change refetches it. refresh() only touches the view that is
+// on screen, so editing these from the Calendar costs nothing until you switch.
+function persistCrField() {
+  state.config.crFieldName = crFieldInput.value.trim();
+  saveConfig();
+  refresh();
+}
+function persistReviewStatuses() {
+  state.config.reviewStatuses = reviewStatusRows.value.map(s => s.trim()).filter(Boolean);
+  saveConfig();
+  refresh();
+}
+function addReviewStatus() {
+  reviewStatusRows.value.push("");
+}
+function removeReviewStatus(i) {
+  reviewStatusRows.value.splice(i, 1);
+  persistReviewStatuses();
+}
+
+// Both are required for the queue to mean anything — an empty one returns
+// nothing rather than everything, so it is flagged rather than silently allowed.
+const crFieldMissing = computed(() => !crFieldInput.value.trim());
+const reviewStatusesMissing = computed(() => !reviewStatusRows.value.some(r => r.trim()));
+
 // Another workspace means other tasks, other sprints and other time entries, so
 // drop the caches that aren't already scoped by workspace. A Folder id belongs to
 // the workspace it was picked in and can't carry over either — clearing it makes
@@ -412,6 +443,8 @@ function disconnect() {
   state.onCall.clear();
   state.dayEntries = [];
   state.tasks = [];
+  state.reviews = [];
+  state.reviewsHint = "";
   // Drop the loaded-period markers too, so the calendar and day views treat the
   // next refresh as a first load rather than a silent one.
   state.entriesPeriod = "";
@@ -797,6 +830,73 @@ function disconnectGh() {
             >
               Reset order
             </button>
+          </div>
+        </div>
+        <!-- Code reviews -->
+        <div class="set-card">
+          <div>
+            <div class="set-label">Code reviews</div>
+            <div class="set-help">
+              What fills the Code reviews tab. ClickUp has no reviewer of its own, so a review is a
+              task sitting in one of these statuses with you named in a people-type Custom Field.
+              The field is looked up by name, so the same name in every List is enough — its id
+              differs per List and can't be matched.
+            </div>
+          </div>
+
+          <label class="mini-field">
+            <span class="mini-label">Reviewer field</span>
+            <input
+              v-model="crFieldInput"
+              :class="{ invalid: crFieldMissing }"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              :placeholder="DEFAULT_CR_FIELD_NAME"
+              :title="crFieldMissing ? 'Without a field name nothing can match.' : ''"
+              @change="persistCrField"
+            />
+          </label>
+
+          <div>
+            <div class="set-label">Review statuses</div>
+            <div class="set-help">
+              Matched case-insensitively against your workspace's status names — the suggestions
+              come from the statuses your own tasks use. Default:
+              <code>{{ DEFAULT_REVIEW_STATUSES.join(", ") }}</code
+              >.
+            </div>
+          </div>
+          <datalist id="cr-status-options">
+            <option v-for="row in statusRows" :key="row.key" :value="row.raw" />
+          </datalist>
+          <div v-if="reviewStatusRows.length" class="list-rows">
+            <div v-for="(_, i) in reviewStatusRows" :key="i" class="list-row">
+              <input
+                v-model="reviewStatusRows[i]"
+                list="cr-status-options"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Status name"
+                @change="persistReviewStatuses"
+              />
+              <button
+                class="row-remove"
+                type="button"
+                aria-label="Remove"
+                @click="removeReviewStatus(i)"
+              >
+                −
+              </button>
+            </div>
+          </div>
+          <div v-else class="list-empty-note">
+            No review statuses yet — the Code reviews tab stays empty until one is added.
+          </div>
+          <button class="row-add" type="button" @click="addReviewStatus">＋ Add status</button>
+          <div v-if="reviewStatusesMissing || crFieldMissing" class="set-help">
+            The Code reviews tab needs both a field name and at least one status to load anything.
           </div>
         </div>
       </template>

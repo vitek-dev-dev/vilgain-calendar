@@ -15,6 +15,7 @@ const TABS = [
   { key: "month", label: "Calendar", icon: "📅" },
   { key: "day", label: "Day", icon: "🕒" },
   { key: "tasks", label: "Tasks", icon: "✅" },
+  { key: "reviews", label: "Code reviews", icon: "🔍" },
   { key: "prs", label: "Pull requests", icon: "🔀" },
 ];
 
@@ -29,10 +30,11 @@ const title = computed(() => {
   }
 });
 
-// On Tasks / PRs the label is replaced by a link to the source app.
+// On the ClickUp / GitHub lists the label is replaced by a link to the source app.
 const titleLink = computed(() => {
   switch (state.view) {
     case "tasks":
+    case "reviews":
       return { href: "https://app.clickup.com", label: "app.clickup.com" };
     case "prs": {
       const org = (state.config.githubOrg || "").trim();
@@ -46,6 +48,13 @@ const titleLink = computed(() => {
 });
 
 const isCal = computed(() => state.view === "month" || state.view === "day");
+
+// Count of reviews waiting on you, shown as a badge on the Code reviews tab so
+// the queue depth is visible from any view. Keyed by tab so only "reviews"
+// carries one; other tabs return 0 and render nothing.
+function tabCount(key) {
+  return key === "reviews" ? state.reviews.length : 0;
+}
 
 // Only the view on screen fetches anything, so the spinner belongs on the active
 // tab — it takes the icon's place so the tab does not change width mid-refresh.
@@ -84,7 +93,13 @@ function today() {
             :aria-label="`Loading ${t.label}`"
           ></span>
           <span v-else class="tab-ico" aria-hidden="true">{{ t.icon }}</span> </span
-        >{{ t.label }}
+        >{{ t.label
+        }}<span
+          v-if="tabCount(t.key) > 0"
+          class="tab-count"
+          :aria-label="`${tabCount(t.key)} awaiting review`"
+          >{{ tabCount(t.key) }}</span
+        >
       </button>
     </div>
 

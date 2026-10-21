@@ -26,7 +26,7 @@ export const MONTHS = [
 export const LS_KEY = "calendar.clickup.v1";
 export const VIEW_LS_KEY = "calendar.view.v1";
 // Every view the app can show; also the whitelist for the stored / hash view.
-export const VIEWS = ["month", "day", "tasks", "prs"];
+export const VIEWS = ["month", "day", "tasks", "reviews", "prs"];
 // Timeline scale: one hour = 64px (design token).
 export const PX_PER_HOUR = 64;
 
@@ -40,3 +40,10 @@ export const QUICK_LOG_TEMPLATES = [
   { label: "Refinement", start: "13:30", end: "14:00" },
   { label: "Planning", start: "14:30", end: "15:30" },
 ];
+
+// Code reviews view defaults. ClickUp has no notion of a "reviewer", so the
+// queue is defined by two workspace conventions: the statuses that mean "waiting
+// for review", and the name of the people-type Custom Field the reviewers are
+// put in. Both are overridable in Settings → Tasks, because both are per-team.
+export const DEFAULT_CR_FIELD_NAME = "CR";
+export const DEFAULT_REVIEW_STATUSES = ["code review"];

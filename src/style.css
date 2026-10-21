@@ -66,6 +66,14 @@ body{
   border:2px solid rgba(255,255,255,.2);border-top-color:currentColor;
   animation:spin .8s linear infinite;
 }
+/* Queue-depth badge on the Code reviews tab. Sits after the label; the accent
+   fill keeps it legible on both the dimmed and the active tab. */
+.tab .tab-count{
+  min-width:18px;height:18px;padding:0 6px;border-radius:999px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font:700 11px system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:#fff;background:var(--accent-2);
+}
 .tab:hover{color:rgba(255,255,255,.8)}
 .tab.active{color:#fff;background:rgba(255,255,255,.08);border-bottom-color:var(--accent-2)}
 /* min-height reserves the .datenav row (34px + the 8px padding) so the tab bar
@@ -228,8 +236,17 @@ a.view-title-link .ext-ico{font-size:12px;opacity:.7}
 .cal-legend .sw{width:14px;height:14px;border-radius:4px;border:2px solid transparent}
 
 /* ---------- Day view ---------- */
-.day-panel{padding:22px 26px 26px}
-.day-badge-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:22px}
+/* The day view claims the leftover viewport height so the timeline reaches the
+   bottom of the screen: the root and the panel are flex columns, the tiles keep
+   their natural height, and .timeline-fill takes what is left. The timeline's
+   per-hour density is scaled to that measured height in JS (see useDayView). */
+.day-view{flex:1;min-height:0;display:flex;flex-direction:column}
+.day-view>.tiles{flex:none}
+.day-panel{padding:22px 26px 26px;flex:1;min-height:0;display:flex;flex-direction:column}
+.day-badge-row{flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:22px}
+/* No overflow: a day taller than the screen grows the page (and scrolls) rather
+   than clipping the hour labels that sit just above the top gridline. */
+.timeline-fill{flex:1;min-height:0}
 /* Quick log sits opposite the badge; margin-auto rather than space-between so the
    badge stays right when the row is withheld. */
 .quick-log{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-right:auto}
@@ -634,6 +651,44 @@ a.pr-card{text-decoration:none;color:inherit}
 .pr-status.pending{color:var(--amber);background:#fffbeb;border:1px solid #fde68a}
 .pr-status.draft{color:var(--muted);background:var(--cell-weekend);border:1px solid #e2e8f0}
 
+/* ---------- Code reviews ---------- */
+/* A flat queue rather than status groups: with one review status the group head
+   would be a heading over the whole list, and the status still reads on each row
+   from the dot and the pill — both painted in ClickUp's own status colour. */
+.cr-list{display:flex;flex-direction:column;gap:9px}
+.cr-card{
+  background:var(--card);border:1px solid rgba(15,23,42,.07);border-radius:11px;
+  padding:12px 14px;box-shadow:0 1px 2px rgba(15,23,42,.04);
+  display:flex;align-items:flex-start;gap:10px;
+}
+a.cr-card{text-decoration:none;color:inherit}
+.cr-card.clickable{cursor:pointer;transition:box-shadow .12s ease,transform .12s ease}
+.cr-card.clickable:hover{box-shadow:0 4px 14px rgba(8,12,28,.1);transform:translateY(-1px)}
+.cr-card.clickable:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cr-dot{width:9px;height:9px;border-radius:3px;flex:none;margin-top:5px;background:var(--disabled)}
+.cr-main{flex:1;min-width:0}
+.cr-title{font:600 13.5px system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.35;color:var(--ink)}
+/* Same fixed line box as .pr-meta: the row wraps on a narrow window, and every
+   card agrees on height so the skeleton can stand in for a loaded one. */
+.cr-meta{
+  display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;
+  line-height:14px;min-height:14px;
+}
+.cr-id{font:600 11px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);font-variant-numeric:tabular-nums}
+.cr-list-name{font:500 11px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted)}
+.cr-by,.cr-age,.cr-others,.cr-tracked,.cr-prio{font-size:11px;color:var(--faint)}
+.cr-prio{font-weight:600;color:var(--muted)}
+/* The queue is ordered by how long a review has waited, so the age is the one
+   piece of meta that is never decoration. */
+.cr-age{font-weight:600;font-variant-numeric:tabular-nums}
+/* Status names are workspace-defined, so the pill takes ClickUp's colour inline
+   rather than mapping to a fixed set the way .pr-status does. */
+.cr-status{
+  flex:none;font:600 11px system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:3px 9px;border-radius:999px;white-space:nowrap;
+  border:1px solid var(--disabled);background:var(--panel);color:var(--muted);
+}
+
 /* ---------- Settings modal ---------- */
 .settings-backdrop{
   position:fixed;inset:0;z-index:60;
@@ -865,6 +920,10 @@ a.pr-card{text-decoration:none;color:inherit}
 /* The status pill's real variants add a 1px border — keep the box identical. */
 .pr-status.sk{border:1px solid transparent;width:66px}
 .pr-ci.sk{width:14px;border-radius:50%}
+/* Review rows: the status pill also carries a 1px border, and the leading dot is
+   a rounded square rather than a bar. */
+.cr-status.sk{border-radius:999px;border:1px solid transparent;width:78px}
+.cr-dot.sk{border-radius:3px}
 .group-name.sk{width:104px}
 .group-count.sk{width:22px}
 /* One bar stands in for the tracked/estimate pair — .task-time is never the

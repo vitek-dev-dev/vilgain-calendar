@@ -1,22 +1,6 @@
 import { computed } from "vue";
 import { state } from "../store.js";
-
-// Compact "created X ago" label from an ISO timestamp.
-function relativeAge(iso) {
-  const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return "";
-  const mins = Math.max(0, Math.floor((Date.now() - then) / 60000));
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks}w`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo`;
-  return `${Math.floor(days / 365)}y`;
-}
+import { relativeAge } from "../utils/date.js";
 
 // Review status → badge label + CSS class (see .pr-status.* in style.css).
 function reviewStatus(pr) {

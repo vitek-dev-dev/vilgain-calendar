@@ -10,12 +10,13 @@ import {
   NOW_TICK_MS,
 } from "./store.js";
 import { iso } from "./utils/date.js";
-import { cuReady, cuLoadUser } from "./composables/useClickUp.js";
+import { cuReady, cuLoadUser, cuLoadReviews } from "./composables/useClickUp.js";
 import { prewarmTaskPool } from "./composables/useTaskFinder.js";
 import { setView, shiftMonth, shiftDay } from "./composables/useCalendar.js";
 import { useMonthView } from "./composables/useMonthView.js";
 import { useDayView } from "./composables/useDayView.js";
 import { useTasksView } from "./composables/useTasksView.js";
+import { useReviewsView } from "./composables/useReviewsView.js";
 import { usePRsView } from "./composables/usePRsView.js";
 
 import AppHeader from "./components/AppHeader.vue";
@@ -25,11 +26,13 @@ import StatsBar from "./components/StatsBar.vue";
 import MonthGrid from "./components/MonthGrid.vue";
 import DayTimeline from "./components/DayTimeline.vue";
 import TasksView from "./components/TasksView.vue";
+import ReviewsView from "./components/ReviewsView.vue";
 import PRsView from "./components/PRsView.vue";
 
 const { model: monthModel } = useMonthView();
 const { model: dayModel } = useDayView();
 const { model: tasksModel } = useTasksView();
+const { model: reviewsModel } = useReviewsView();
 const { model: prsModel } = usePRsView();
 
 const settingsOpen = ref(false);
@@ -122,6 +125,12 @@ onMounted(async () => {
       // against a populated list. Deliberately not awaited — the current view's
       // own data must not wait behind it.
       prewarmTaskPool();
+      // Load the Code reviews queue in the background too, so the tab's badge
+      // shows how many reviews are waiting from any view — not only once the
+      // Code reviews tab has been opened. Called directly rather than through
+      // refresh() so it never lights the active tab's spinner. When reviews is
+      // the view on screen it already fetches this itself, so skip the duplicate.
+      if (state.view !== "reviews") cuLoadReviews();
     } catch (err) {
       setStatus("ClickUp: " + err.message);
     }
@@ -183,6 +192,16 @@ onUnmounted(() => {
         <span class="secct">{{ tasksModel.count }}</span>
       </div>
       <TasksView :groups="tasksModel.groups" :loading="isLoading" />
+    </template>
+
+    <!-- Code reviews -->
+    <template v-else-if="state.view === 'reviews'">
+      <div class="seclbl">
+        <span class="sec-ico" aria-hidden="true">🔍</span>
+        ClickUp code reviews — waiting on me, longest first
+        <span class="secct">{{ reviewsModel.count }}</span>
+      </div>
+      <ReviewsView :reviews="reviewsModel.reviews" :hint="reviewsModel.hint" :loading="isLoading" />
     </template>
 
     <!-- Pull requests -->

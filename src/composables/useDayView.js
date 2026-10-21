@@ -1,5 +1,12 @@
 import { computed } from "vue";
-import { state, workingHours, nowTick, hoursPerDay, mandayHours } from "../store.js";
+import {
+  state,
+  workingHours,
+  nowTick,
+  hoursPerDay,
+  mandayHours,
+  dayTimelineViewport,
+} from "../store.js";
 import { PX_PER_HOUR } from "../constants.js";
 import {
   iso,
@@ -237,12 +244,21 @@ export function useDayView() {
     maxH = Math.min(24, maxH);
     if (maxH <= minH) maxH = minH + 1;
 
+    // Stretch the per-hour density so the timeline fills the height the panel
+    // gives it, keeping PX_PER_HOUR as a floor: a short day expands to reach the
+    // bottom of a tall screen, while a long day never compresses below the
+    // readable default and scrolls instead. `dayTimelineViewport` is 0 before the
+    // first measure, which falls back to the floor for that initial frame.
+    const span = maxH - minH;
+    const pxPerHour =
+      span > 0 ? Math.max(PX_PER_HOUR, dayTimelineViewport.value / span) : PX_PER_HOUR;
+
     // Hour gridlines, inclusive of the closing hour (design shows 08:00…17:00).
     const hours = [];
     for (let h = minH; h <= maxH; h++) {
-      hours.push({ h, label: `${pad(h)}:00`, top: (h - minH) * PX_PER_HOUR });
+      hours.push({ h, label: `${pad(h)}:00`, top: (h - minH) * pxPerHour });
     }
-    const height = (maxH - minH) * PX_PER_HOUR;
+    const height = span * pxPerHour;
 
     // Slots are laid out alongside the entries: they only avoid regular work, so
     // an On Call shift covering the same stretch has to sit beside a slot rather
@@ -265,10 +281,10 @@ export function useDayView() {
       .filter(e => e._slot !== undefined)
       .map(seed => {
         const [s, e] = freeSlots[seed._slot];
-        const blockHeight = Math.max(22, (e - s) * PX_PER_HOUR - 6);
+        const blockHeight = Math.max(22, (e - s) * pxPerHour - 6);
         return {
           id: `free-${s}-${e}`,
-          top: (s - minH) * PX_PER_HOUR,
+          top: (s - minH) * pxPerHour,
           height: blockHeight,
           left: laneLeft(seed._col, seed._cols),
           width: `calc(${laneSpan(seed._cols)})`,
@@ -288,8 +304,8 @@ export function useDayView() {
       .filter(e => e._slot === undefined)
       .map(e => {
         const startFrac = startFracOf(e);
-        const top = (startFrac - minH) * PX_PER_HOUR;
-        const rawHeight = (endFracOf(e) - startFrac) * PX_PER_HOUR - 6;
+        const top = (startFrac - minH) * pxPerHour;
+        const rawHeight = (endFracOf(e) - startFrac) * pxPerHour - 6;
         const blockHeight = Math.max(22, rawHeight);
         const width = `calc(${laneSpan(e._cols)})`;
         const left = laneLeft(e._col, e._cols);
@@ -320,7 +336,7 @@ export function useDayView() {
 
     const nowLine =
       isToday && nowFrac >= minH && nowFrac <= maxH
-        ? { top: (nowFrac - minH) * PX_PER_HOUR, label: timeOfDay(now) }
+        ? { top: (nowFrac - minH) * pxPerHour, label: timeOfDay(now) }
         : null;
 
     return {

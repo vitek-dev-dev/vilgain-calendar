@@ -1,5 +1,6 @@
 <script setup>
-import { isLoading, dayLoaded } from "../store.js";
+import { ref, onMounted, onBeforeUnmount } from "vue";
+import { isLoading, dayLoaded, dayTimelineViewport } from "../store.js";
 import { QUICK_LOG_TEMPLATES } from "../constants.js";
 import { PINNED_MODE } from "../composables/useTaskFinder.js";
 
@@ -11,10 +12,36 @@ defineProps({
 // event: a fixed range with no slot behind it, opened on the Pinned tab because
 // a ceremony is logged against a recurring task rather than a searched-for one.
 const emit = defineEmits(["log-slot"]);
+
+// The timeline fills the leftover viewport height. Its per-hour density (see
+// useDayView) is scaled to this element's measured height, so we publish that
+// height to the store and keep it current as the window resizes. The wrapper is
+// flex:1 with no overflow, so its box is the space left below the tiles and
+// badge row — measuring it never depends on the timeline's own scaled height.
+const fillEl = ref(null);
+let ro = null;
+
+onMounted(() => {
+  if (!fillEl.value) return;
+  const publish = () => {
+    if (fillEl.value) dayTimelineViewport.value = fillEl.value.clientHeight;
+  };
+  if (typeof ResizeObserver !== "undefined") {
+    ro = new ResizeObserver(publish);
+    ro.observe(fillEl.value);
+  } else {
+    publish();
+  }
+});
+
+onBeforeUnmount(() => {
+  if (ro) ro.disconnect();
+  ro = null;
+});
 </script>
 
 <template>
-  <div>
+  <div class="day-view">
     <section
       class="tiles"
       :class="[model.stats.onCallShow ? 'cols-6' : 'cols-5', { loading: isLoading && !dayLoaded }]"
@@ -72,65 +99,67 @@ const emit = defineEmits(["log-slot"]);
         <span class="day-badge" :class="model.badge.cls">{{ model.badge.label }}</span>
       </div>
 
-      <div v-if="model.empty" class="tl-empty">{{ model.empty }}</div>
+      <div ref="fillEl" class="timeline-fill">
+        <div v-if="model.empty" class="tl-empty">{{ model.empty }}</div>
 
-      <div v-else class="timeline" :style="{ height: model.timeline.height + 'px' }">
-        <div
-          v-for="row in model.timeline.hours"
-          :key="row.h"
-          class="tl-hour-line"
-          :style="{ top: row.top + 'px' }"
-        >
-          <span class="lbl">{{ row.label }}</span>
-        </div>
+        <div v-else class="timeline" :style="{ height: model.timeline.height + 'px' }">
+          <div
+            v-for="row in model.timeline.hours"
+            :key="row.h"
+            class="tl-hour-line"
+            :style="{ top: row.top + 'px' }"
+          >
+            <span class="lbl">{{ row.label }}</span>
+          </div>
 
-        <button
-          v-for="slot in model.timeline.placeholders"
-          :key="slot.id"
-          type="button"
-          class="tl-free"
-          :class="{ short: slot.short }"
-          :style="{
-            top: slot.top + 'px',
-            height: slot.height + 'px',
-            left: slot.left,
-            width: slot.width,
-          }"
-          :title="slot.tooltip"
-          @click="emit('log-slot', { start: slot.start, end: slot.end })"
-        >
-          <span class="tf-range">{{ slot.rangeText }}</span>
-          <span class="tf-meta">{{ slot.durationText }} free</span>
-          <span class="tf-cta" aria-hidden="true">Log time</span>
-        </button>
+          <button
+            v-for="slot in model.timeline.placeholders"
+            :key="slot.id"
+            type="button"
+            class="tl-free"
+            :class="{ short: slot.short }"
+            :style="{
+              top: slot.top + 'px',
+              height: slot.height + 'px',
+              left: slot.left,
+              width: slot.width,
+            }"
+            :title="slot.tooltip"
+            @click="emit('log-slot', { start: slot.start, end: slot.end })"
+          >
+            <span class="tf-range">{{ slot.rangeText }}</span>
+            <span class="tf-meta">{{ slot.durationText }} free</span>
+            <span class="tf-cta" aria-hidden="true">Log time</span>
+          </button>
 
-        <component
-          :is="block.tag"
-          v-for="block in model.timeline.blocks"
-          :key="block.id"
-          class="tl-block"
-          :class="{ oncall: block.isOnCall, short: block.short, clickable: block.clickable }"
-          :href="block.href || null"
-          :target="block.href ? '_blank' : null"
-          :rel="block.href ? 'noopener noreferrer' : null"
-          :style="{
-            top: block.top + 'px',
-            height: block.height + 'px',
-            left: block.left,
-            width: block.width,
-          }"
-          :title="block.tooltip"
-        >
-          <div class="tb-title">{{ block.titleText }}</div>
-          <div v-if="block.showMeta" class="tb-meta">{{ block.metaText }}</div>
-        </component>
+          <component
+            :is="block.tag"
+            v-for="block in model.timeline.blocks"
+            :key="block.id"
+            class="tl-block"
+            :class="{ oncall: block.isOnCall, short: block.short, clickable: block.clickable }"
+            :href="block.href || null"
+            :target="block.href ? '_blank' : null"
+            :rel="block.href ? 'noopener noreferrer' : null"
+            :style="{
+              top: block.top + 'px',
+              height: block.height + 'px',
+              left: block.left,
+              width: block.width,
+            }"
+            :title="block.tooltip"
+          >
+            <div class="tb-title">{{ block.titleText }}</div>
+            <div v-if="block.showMeta" class="tb-meta">{{ block.metaText }}</div>
+          </component>
 
-        <div
-          v-if="model.timeline.nowLine"
-          class="tl-now"
-          :style="{ top: model.timeline.nowLine.top + 'px' }"
-        >
-          <span class="now-label">{{ model.timeline.nowLine.label }}</span>
+          <div
+            v-if="model.timeline.nowLine"
+            class="tl-now"
+            :style="{ top: model.timeline.nowLine.top + 'px' }"
+          >
+            <span class="now-label">{{ model.timeline.nowLine.label }}</span>
+          </div>
         </div>
       </div>
 

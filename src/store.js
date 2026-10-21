@@ -1,5 +1,11 @@
 import { reactive, computed, ref } from "vue";
-import { LS_KEY, VIEW_LS_KEY, VIEWS } from "./constants.js";
+import {
+  LS_KEY,
+  VIEW_LS_KEY,
+  VIEWS,
+  DEFAULT_CR_FIELD_NAME,
+  DEFAULT_REVIEW_STATUSES,
+} from "./constants.js";
 import { startOfMonth, startOfDay, iso, monthKey } from "./utils/date.js";
 
 export function loadConfig() {
@@ -17,6 +23,8 @@ export function loadConfig() {
     priorityTasks: [],
     sprintFolderId: "",
     taskSort: "default",
+    crFieldName: DEFAULT_CR_FIELD_NAME,
+    reviewStatuses: [...DEFAULT_REVIEW_STATUSES],
     githubToken: "",
     githubOrg: "",
     holidayHours: {}, // "YYYY-MM" -> hours of holiday taken that month
@@ -31,6 +39,10 @@ export function loadConfig() {
     if (!parsed.holidayHours || typeof parsed.holidayHours !== "object") {
       delete parsed.holidayHours;
     }
+    // A hand-edited or half-migrated value would otherwise reach the Code
+    // reviews query as a non-iterable; fall back to the default rather than
+    // shipping it a broken filter.
+    if (!Array.isArray(parsed.reviewStatuses)) delete parsed.reviewStatuses;
     return { ...defaults, ...parsed };
   } catch {
     return { ...defaults };
@@ -42,6 +54,7 @@ export function viewFromHash() {
   if (h === "day" || h === "today") return "day";
   if (h === "month" || h === "calendar") return "month";
   if (h === "tasks") return "tasks";
+  if (h === "reviews" || h === "code-reviews" || h === "cr") return "reviews";
   if (h === "prs" || h === "pulls" || h === "pull-requests") return "prs";
   return null;
 }
@@ -62,6 +75,10 @@ export const state = reactive({
   dayEntries: [], // raw entries for the timeline
   dayEntriesKey: "", // "YYYY-MM-DD" dayEntries was loaded for
   tasks: [], // normalized ClickUp tasks assigned to the current user
+  reviews: [], // normalized ClickUp tasks in a review status with me in the CR field
+  // Why the Code reviews list came back empty, when it did: distinguishes "no
+  // task is waiting on you" from "the configured CR field isn't on these tasks".
+  reviewsHint: "",
   ghPrs: [], // normalized GitHub pull requests authored by the current user
   config: initialConfig,
   cuUser: null, // authenticated ClickUp account; its id scopes task queries
@@ -81,6 +98,12 @@ export const isLoading = computed(() => state.loading > 0);
 // trailing free slot that runs up to it.
 export const nowTick = ref(Date.now());
 export const NOW_TICK_MS = 30000;
+
+// Pixel height available to the day timeline, measured from the DOM (see
+// DayTimeline.vue). The day view scales its per-hour density to fill this so the
+// timeline reaches the bottom of the screen instead of ending mid-page on a tall
+// display. 0 until measured — the model falls back to the default density then.
+export const dayTimelineViewport = ref(0);
 
 // Whether the month / day on screen has already been fetched. These drive the
 // same silent-refresh behaviour the Tasks and PRs views have: a period we have

@@ -46,7 +46,11 @@ export function isOnCallTask(name) {
 export async function cuFetch(path, params) {
   const token = state.config.token;
   if (!token) throw new Error("Missing ClickUp token");
-  const qs = params ? "?" + new URLSearchParams(params) : "";
+  // URLSearchParams form-encodes a space as "+", but ClickUp's filters — the
+  // `statuses[]` the Code reviews queue is built on above all — want "%20" and
+  // otherwise match the literal "+". A bare "+" in the serialized output is
+  // always an encoded space (a literal one comes out as %2B), so this is lossless.
+  const qs = params ? "?" + String(new URLSearchParams(params)).replace(/\+/g, "%20") : "";
   const res = await fetch(`https://api.clickup.com/api/v2${path}${qs}`, {
     headers: { Authorization: token, Accept: "application/json" },
   });
@@ -420,6 +424,154 @@ export async function cuLoadTasks() {
     }
     state.tasks = all.map(normalizeTask);
     setCuPill("ok", `ClickUp: ${all.length} ${all.length === 1 ? "task" : "tasks"}`);
+  } catch (err) {
+    setCuPill("err", "ClickUp: error");
+    setStatus("ClickUp: " + err.message);
+  }
+}
+
+// ---------- Code reviews ----------
+
+// ClickUp models reviewers as a people-type Custom Field rather than a first
+// class concept, and the field is created per Space/Folder/List — the same "CR"
+// field has a different id in every List, so it cannot be filtered server-side
+// by id. The queue is therefore fetched by *status* (which the API does filter,
+// and which bounds the result set) and narrowed to the field by name here.
+
+// The configured review statuses, trimmed and de-duplicated case-insensitively.
+export function reviewStatusNames() {
+  const seen = new Set();
+  const out = [];
+  for (const raw of state.config.reviewStatuses || []) {
+    const name = String(raw).trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
+export function crFieldName() {
+  return String(state.config.crFieldName ?? "").trim();
+}
+
+// A people field's value is an array of user objects; a hand-migrated or group
+// entry can arrive as a bare id, so both shapes are accepted. Anything without
+// an id (a user group, a null slot) is dropped rather than matched loosely.
+function normalizeFieldUsers(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(v => (v && typeof v === "object" ? v : { id: v }))
+    .filter(u => u.id !== null && u.id !== undefined && u.id !== "")
+    .map(u => ({
+      id: String(u.id),
+      name: u.username || u.email || "",
+      initials: u.initials || "",
+      color: u.color || "",
+    }));
+}
+
+// The task's CR field, matched on name case-insensitively. Returns null when the
+// task has no such field at all — distinct from a field that is simply empty,
+// which is what lets the view explain a misconfigured field name.
+function crFieldOf(task, wantedKey) {
+  const fields = Array.isArray(task.custom_fields) ? task.custom_fields : [];
+  const field = fields.find(
+    f =>
+      String(f?.name ?? "")
+        .trim()
+        .toLowerCase() === wantedKey,
+  );
+  return field ? normalizeFieldUsers(field.value) : null;
+}
+
+function normalizeReview(t, reviewers, myId) {
+  const base = normalizeTask(t);
+  const updated = Number(t.date_updated);
+  return {
+    ...base,
+    customId: t.custom_id || "",
+    updatedAt: Number.isFinite(updated) ? updated : 0,
+    // Who the work belongs to — on a review queue that is the person to go back
+    // to, so it is worth a line even though the task isn't assigned to you.
+    assignees: (t.assignees || []).map(a => ({
+      id: String(a.id),
+      name: a.username || a.email || "",
+      initials: a.initials || "",
+      color: a.color || "",
+    })),
+    reviewers,
+    otherReviewers: reviewers.filter(r => r.id !== myId).length,
+  };
+}
+
+// Tasks sitting in one of the configured review statuses that name the current
+// user in the CR people field. Mirrors cuLoadTasks: the previous list stays on
+// screen while refetching, and an error keeps it rather than blanking the view.
+export async function cuLoadReviews() {
+  if (!cuReady()) {
+    state.reviews = [];
+    state.reviewsHint = "";
+    return;
+  }
+  const statuses = reviewStatusNames();
+  const wantedField = crFieldName();
+  if (!statuses.length || !wantedField) {
+    state.reviews = [];
+    state.reviewsHint = !statuses.length
+      ? "No review statuses are configured."
+      : "No CR field name is configured.";
+    return;
+  }
+  const wantedKey = wantedField.toLowerCase();
+  const all = [];
+  try {
+    const myId = await cuMyUserId();
+    if (!myId) throw new Error("couldn't identify your account");
+    for (let page = 0; page < 10; page++) {
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      // The status filter already bounds the result set, so including closed
+      // tasks only covers the case of a review status typed as closed.
+      params.set("include_closed", "true");
+      params.set("subtasks", "true");
+      params.set("order_by", "updated");
+      for (const s of statuses) params.append("statuses[]", s);
+      const json = await cuFetch(`/team/${state.config.teamId}/task`, params);
+      const list = json.tasks || [];
+      all.push(...list);
+      if (json.last_page || list.length < 100) break;
+    }
+    // The API is the authority on which statuses exist, but a filter it silently
+    // ignores would otherwise fill the queue with unrelated work.
+    const statusKeys = new Set(statuses.map(s => s.toLowerCase()));
+    const inReview = all.filter(t =>
+      statusKeys.has(
+        String(t.status?.status ?? "")
+          .trim()
+          .toLowerCase(),
+      ),
+    );
+    let withField = 0;
+    const mine = [];
+    for (const t of inReview) {
+      const reviewers = crFieldOf(t, wantedKey);
+      if (!reviewers) continue;
+      withField++;
+      if (reviewers.some(r => r.id === myId)) mine.push(normalizeReview(t, reviewers, myId));
+    }
+    state.reviews = mine;
+    // Only worth explaining when the list is empty; a populated queue speaks for
+    // itself, and a stale hint under it would just be noise.
+    state.reviewsHint = mine.length
+      ? ""
+      : !inReview.length
+        ? `No tasks are in ${statuses.join(" / ")}.`
+        : !withField
+          ? `None of the ${inReview.length} tasks in ${statuses.join(" / ")} have a Custom Field named “${wantedField}”.`
+          : "";
+    setCuPill("ok", `ClickUp: ${mine.length} ${mine.length === 1 ? "review" : "reviews"}`);
   } catch (err) {
     setCuPill("err", "ClickUp: error");
     setStatus("ClickUp: " + err.message);

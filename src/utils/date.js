@@ -61,3 +61,21 @@ export function formatTodayHeader(date) {
   const wd = WEEKDAYS_FULL[mondayIndex(date)];
   return `${wd}, ${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
+
+// Compact "created/updated X ago" label, from an epoch-ms timestamp or an ISO
+// string. Shared by the PR list and the code-review queue.
+export function relativeAge(when) {
+  const then = typeof when === "number" ? when : new Date(when).getTime();
+  if (!Number.isFinite(then) || then <= 0) return "";
+  const mins = Math.max(0, Math.floor((Date.now() - then) / 60000));
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  return `${Math.floor(days / 365)}y`;
+}

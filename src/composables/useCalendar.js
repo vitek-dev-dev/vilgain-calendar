@@ -1,7 +1,7 @@
 import { state } from "../store.js";
 import { VIEW_LS_KEY, VIEWS } from "../constants.js";
 import { startOfMonth, startOfDay } from "../utils/date.js";
-import { cuLoadTimeEntries, cuLoadDayEntries, cuLoadTasks } from "./useClickUp.js";
+import { cuLoadTimeEntries, cuLoadDayEntries, cuLoadTasks, cuLoadReviews } from "./useClickUp.js";
 import { ghLoadPRs } from "./useGitHub.js";
 import { loadHolidays } from "./useHolidays.js";
 
@@ -24,6 +24,8 @@ export async function refresh() {
       ]);
     } else if (state.view === "tasks") {
       await cuLoadTasks();
+    } else if (state.view === "reviews") {
+      await cuLoadReviews();
     } else if (state.view === "prs") {
       await ghLoadPRs();
     } else if (state.view === "month") {
