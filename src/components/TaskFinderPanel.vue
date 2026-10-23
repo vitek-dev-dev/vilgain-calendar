@@ -30,7 +30,7 @@ const props = defineProps({
 });
 const emit = defineEmits(["select"]);
 
-const { loading, refreshing, error, tasks, sprintTasks, truncated, load } = useTaskFinder();
+const { loading, refreshing, error, tasks, sharedTasks, truncated, load } = useTaskFinder();
 
 const query = ref("");
 const includeClosed = ref(false);
@@ -79,13 +79,13 @@ function setSort(key) {
 
 const RESULT_LIMIT = 80;
 
-// Priority tasks from the current sprint that aren't assigned to you. Default
-// and Pinned only — the other sorts are about your own history, which these have
-// none of. Filtered here rather than at fetch so editing the patterns applies at
-// once.
+// Priority tasks from the pinned-tasks location (Settings → Tasks) and the
+// current sprint that aren't assigned to you. Default and Pinned only — the other
+// sorts are about your own history, which these have none of. Filtered here
+// rather than at fetch so editing the patterns applies at once.
 const extraTasks = computed(() =>
   sortMode.value === "default" || sortMode.value === PINNED_MODE
-    ? sprintTasks.value.filter(isPriorityTask)
+    ? sharedTasks.value.filter(isPriorityTask)
     : [],
 );
 

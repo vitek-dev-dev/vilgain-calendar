@@ -22,6 +22,9 @@ export function loadConfig() {
     priorityStatuses: [],
     priorityTasks: [],
     sprintFolderId: "",
+    // Where shared pinned tasks (e.g. "BAU | Meetings", assigned to nobody) are
+    // loaded from: { kind: "list" | "folder", id, name, link } or null.
+    pinnedSource: null,
     taskSort: "default",
     crFieldName: DEFAULT_CR_FIELD_NAME,
     reviewStatuses: [...DEFAULT_REVIEW_STATUSES],
@@ -43,6 +46,15 @@ export function loadConfig() {
     // reviews query as a non-iterable; fall back to the default rather than
     // shipping it a broken filter.
     if (!Array.isArray(parsed.reviewStatuses)) delete parsed.reviewStatuses;
+    // Same for the pinned-tasks location: anything without an id would reach the
+    // task query as a filter on "undefined".
+    if (
+      !parsed.pinnedSource ||
+      typeof parsed.pinnedSource !== "object" ||
+      !parsed.pinnedSource.id
+    ) {
+      delete parsed.pinnedSource;
+    }
     return { ...defaults, ...parsed };
   } catch {
     return { ...defaults };

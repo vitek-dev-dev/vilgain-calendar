@@ -16,6 +16,7 @@ import {
   cuLoadAccount,
   cuLoadTeams,
   cuLoadFolders,
+  cuResolveLocation,
   cuLoadTasks,
   clearTaskStats,
   isValidOnCallPattern,
@@ -43,6 +44,9 @@ const ghTokenInput = ref("");
 const ghOrgInput = ref("");
 const onCallRows = ref([]);
 const priorityRows = ref([]);
+const pinnedInput = ref("");
+const pinnedResolving = ref(false);
+const pinnedError = ref("");
 const crFieldInput = ref("");
 const reviewStatusRows = ref([]);
 const tokenEl = ref(null);
@@ -119,6 +123,8 @@ watch(
     ghOrgInput.value = state.config.githubOrg || "";
     onCallRows.value = [...(state.config.onCallTasks || [])];
     priorityRows.value = [...(state.config.priorityTasks || [])];
+    pinnedInput.value = state.config.pinnedSource?.link || "";
+    pinnedError.value = "";
     crFieldInput.value = state.config.crFieldName || "";
     reviewStatusRows.value = [...(state.config.reviewStatuses || [])];
     // Guarded so reopening the dialog doesn't refetch what we already have, or fire
@@ -370,6 +376,38 @@ function removePriority(i) {
   persistPriority();
 }
 
+// Pinned-tasks location — a pasted link is resolved to its List or Folder before
+// it is stored, so a typo is reported here instead of silently pinning nothing.
+// The pools cache what was fetched from the old location, so they are dropped.
+// A failed resolve keeps the previous location and leaves the text for fixing.
+async function persistPinnedSource() {
+  const text = pinnedInput.value.trim();
+  pinnedError.value = "";
+  if (!text) {
+    state.config.pinnedSource = null;
+  } else {
+    pinnedResolving.value = true;
+    try {
+      state.config.pinnedSource = { ...(await cuResolveLocation(text)), link: text };
+    } catch (err) {
+      pinnedError.value = err.message;
+      return;
+    } finally {
+      pinnedResolving.value = false;
+    }
+  }
+  saveConfig();
+  clearTaskPools();
+}
+
+const pinnedNote = computed(() => {
+  if (pinnedResolving.value) return "Looking up the link…";
+  if (pinnedError.value) return pinnedError.value;
+  const src = state.config.pinnedSource;
+  if (!src) return "Not set — only your own tasks and the current sprint's can be pinned.";
+  return `Loading from the ${src.kind === "folder" ? "Folder" : "List"} “${src.name || src.id}”.`;
+});
+
 // The CR field name and the review statuses define the Code reviews queue
 // outright, so each change refetches it. refresh() only touches the view that is
 // on screen, so editing these from the Calendar costs nothing until you switch.
@@ -399,9 +437,12 @@ const reviewStatusesMissing = computed(() => !reviewStatusRows.value.some(r => r
 // Another workspace means other tasks, other sprints and other time entries, so
 // drop the caches that aren't already scoped by workspace. A Folder id belongs to
 // the workspace it was picked in and can't carry over either — clearing it makes
-// the Tasks tab ask for a new one instead of silently resolving no sprints.
+// the Tasks tab ask for a new one instead of silently resolving no sprints. The
+// pinned-tasks location is cleared for the same reason.
 function applyClickUpSelect() {
   state.config.sprintFolderId = "";
+  state.config.pinnedSource = null;
+  pinnedInput.value = "";
   folders.value = [];
   saveConfig();
   clearTaskPools();
@@ -704,8 +745,9 @@ function disconnectGh() {
             <div class="set-label">Priority task patterns</div>
             <div class="set-help">
               Tasks whose name matches any of these are pinned to the top of the task picker under
-              the Default sort, including ones in the current sprint that aren't assigned to you.
-              Each row is a case-insensitive regular expression matched anywhere in the name — e.g.
+              the Default sort, including ones from the location below or the current sprint that
+              aren't assigned to you. Each row is a case-insensitive regular expression matched
+              anywhere in the name — e.g.
               <code>^BAU \|</code> for a prefix.
             </div>
           </div>
@@ -737,6 +779,31 @@ function disconnectGh() {
           </div>
           <div v-else class="list-empty-note">No priority task patterns yet.</div>
           <button class="row-add" type="button" @click="addPriority">＋ Add pattern</button>
+        </div>
+
+        <!-- Pinned tasks location -->
+        <div class="set-card">
+          <div>
+            <div class="set-label">Pinned tasks from</div>
+            <div class="set-help">
+              A List or Folder whose tasks the priority patterns above are matched against whoever
+              they're assigned to — for shared tasks like <code>BAU | Meetings</code> that belong to
+              nobody. Paste its ClickUp link, or the link of any of its views.
+            </div>
+          </div>
+          <input
+            v-model="pinnedInput"
+            :class="{ invalid: !!pinnedError }"
+            :disabled="!connected || pinnedResolving"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://app.clickup.com/…"
+            @change="persistPinnedSource"
+          />
+          <div class="list-empty-note" :class="{ 'note-error': !!pinnedError }">
+            {{ pinnedNote }}
+          </div>
         </div>
 
         <!-- Statuses: order + visibility -->

@@ -192,6 +192,35 @@ export async function cuLoadFolders() {
   return folders;
 }
 
+// Resolve a pasted ClickUp link (or a bare List id) to the List or Folder it
+// points at, for the pinned-tasks location in settings. A List's own page
+// (…/li/<id>) and a Folder's (…/v/f/<id>) carry the id in the URL; any other
+// view link only names the view, so GET /view tells us where it lives — parent
+// type 6 is a List, 5 a Folder. Throws with a user-facing message otherwise.
+const VIEW_PARENT_KIND = { 6: "list", 5: "folder" };
+
+async function locationOf(s) {
+  if (/^\d+$/.test(s)) return { kind: "list", id: s };
+  let m = s.match(/clickup\.com\/.*\/li\/(\d+)/i);
+  if (m) return { kind: "list", id: m[1] };
+  m = s.match(/clickup\.com\/.*\/v\/f\/(\d+)/i);
+  if (m) return { kind: "folder", id: m[1] };
+  m = s.match(/clickup\.com\/.*\/v\/[a-z]+\/([^/?#]+)/i);
+  if (!m) throw new Error("Not a ClickUp List or Folder link.");
+  const parent = ((await cuFetch(`/view/${encodeURIComponent(m[1])}`)).view || {}).parent || {};
+  const kind = VIEW_PARENT_KIND[Number(parent.type)];
+  if (!kind || !parent.id) {
+    throw new Error("That view belongs to a Space or the whole Workspace — use a List or Folder.");
+  }
+  return { kind, id: String(parent.id) };
+}
+
+export async function cuResolveLocation(text) {
+  const { kind, id } = await locationOf(String(text || "").trim());
+  const json = await cuFetch(`/${kind}/${encodeURIComponent(id)}`);
+  return { kind, id, name: json.name || "" };
+}
+
 // Per-task totals for a month: taskId -> { hours, last }. Keyed by "YYYY-MM" and
 // filled for free whenever the month grid loads its entries — the picker sorts
 // by it without a fetch of its own. Only a month the calendar never visited

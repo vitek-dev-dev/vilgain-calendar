@@ -165,40 +165,66 @@ async function fetchPool({ includeClosed }) {
   // Resolve sprints before the pool is handed over, so rows never render with a
   // placeholder that then corrects itself.
   await applySprints(tasks);
-  const sprintTasks = await fetchCurrentSprintTasks(new Set(tasks.map(t => t.id)), includeClosed);
-  return { tasks, sprintTasks, truncated };
+  const sharedTasks = await fetchSharedTasks(new Set(tasks.map(t => t.id)), includeClosed);
+  return { tasks, sharedTasks, truncated };
 }
 
-// Everything in the sprint running today, whoever it is assigned to, minus what
-// the pool above already holds. The picker keeps only the ones matching the
-// priority patterns — a shared task you log against is often assigned to someone
-// else, so scoping this by assignee would miss exactly the ones wanted. Filtering
+// Everything in the pinned-tasks location (config.pinnedSource) and in the
+// sprint running today, whoever it is assigned to, minus what the pool above
+// already holds. The picker keeps only the ones matching the priority patterns —
+// a shared task you log against is often assigned to someone else or to nobody,
+// so scoping this by assignee would miss exactly the ones wanted. Filtering
 // happens at render rather than here, so editing the patterns takes effect
 // without a refetch.
-async function fetchCurrentSprintTasks(excludeIds, includeClosed) {
+async function fetchSharedTasks(excludeIds, includeClosed) {
+  const src = state.config.pinnedSource;
   const sprint = currentSprintMeta(Date.now());
-  if (!sprint) return [];
+  const fromSource = src
+    ? fetchSharedPages(`/team/${state.config.teamId}/task`, includeClosed, params => {
+        // Most recently updated first, so a capped sweep of a big board still
+        // reaches the tasks time is logged against day to day.
+        params.set("order_by", "updated");
+        params.append(src.kind === "folder" ? "project_ids[]" : "list_ids[]", src.id);
+      })
+    : [];
+  const fromSprint = sprint
+    ? fetchSharedPages(`/list/${encodeURIComponent(sprint.id)}/task`, includeClosed)
+    : [];
+
+  const seen = new Set(excludeIds);
   const out = [];
+  for (const batch of await Promise.all([fromSource, fromSprint])) {
+    for (const t of batch) {
+      if (seen.has(t.id)) continue;
+      seen.add(t.id);
+      out.push(normalize(t));
+    }
+  }
+  const now = Date.now();
+  for (const t of out) stampSprint(t, now);
+  return out;
+}
+
+// Raw tasks for fetchSharedTasks, up to five pages. A failure yields nothing
+// rather than failing the pool, which is still usable without them.
+async function fetchSharedPages(path, includeClosed, addParams) {
+  const tasks = [];
   try {
     for (let page = 0; page < 5; page++) {
       const params = new URLSearchParams();
       params.set("page", String(page));
       params.set("include_closed", includeClosed ? "true" : "false");
       params.set("subtasks", "true");
-      const json = await cuFetch(`/list/${encodeURIComponent(sprint.id)}/task`, params);
+      if (addParams) addParams(params);
+      const json = await cuFetch(path, params);
       const list = json.tasks || [];
-      for (const t of list) {
-        if (excludeIds.has(t.id)) continue;
-        out.push(normalize(t));
-      }
+      tasks.push(...list);
       if (json.last_page || list.length < PAGE_SIZE) break;
     }
   } catch {
-    return []; // the pool is still usable without them
+    return [];
   }
-  const now = Date.now();
-  for (const t of out) stampSprint(t, now);
-  return out;
+  return tasks;
 }
 
 // A ClickUp task URL (app.clickup.com/t/<teamId>/<id> or /t/<id>), a bare task
@@ -383,21 +409,22 @@ export function useTaskFinder() {
   const refreshing = ref(false);
   const error = ref("");
   const tasks = ref([]);
-  // Current-sprint tasks not assigned to you, kept apart from the pool so only
-  // the Default sort surfaces them.
-  const sprintTasks = ref([]);
+  // Tasks from the pinned-tasks location and the current sprint that aren't
+  // assigned to you, kept apart from the pool so only Default and Pinned surface
+  // them.
+  const sharedTasks = ref([]);
   const truncated = ref(false);
 
   function apply(pool) {
     tasks.value = pool.tasks;
-    sprintTasks.value = pool.sprintTasks || [];
+    sharedTasks.value = pool.sharedTasks || [];
     truncated.value = pool.truncated;
   }
 
   async function load({ includeClosed, force = false }) {
     if (!cuReady()) {
       tasks.value = [];
-      sprintTasks.value = [];
+      sharedTasks.value = [];
       error.value = "Connect ClickUp in settings (⚙) first.";
       return;
     }
@@ -422,7 +449,7 @@ export function useTaskFinder() {
       if (!silent) {
         error.value = err.message;
         tasks.value = [];
-        sprintTasks.value = [];
+        sharedTasks.value = [];
         truncated.value = false;
       }
     } finally {
@@ -431,5 +458,5 @@ export function useTaskFinder() {
     }
   }
 
-  return { loading, refreshing, error, tasks, sprintTasks, truncated, load };
+  return { loading, refreshing, error, tasks, sharedTasks, truncated, load };
 }
